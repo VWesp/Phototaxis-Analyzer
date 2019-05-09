@@ -231,7 +231,6 @@ def openPress(button):
                 app.enableMenuItem("Settings", "Data minute point")
                 app.setLabel("Input", "\nInput: " + datasheet + "\n\nOutput: " + outputDirectory + "\n\nComparing plots:\n -> None")
         except:
-            print(traceback.format_exc())
             datasheet = ""
             outputDirectory = ""
             app.disableMenuItem("PISA", "Start analysis")
