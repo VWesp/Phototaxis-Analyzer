@@ -1,0 +1,8 @@
+[Datasheet file]     	/home/valentin/phototaxis_analyzer_v3/example/PhT64_32_2019-04-30_11-09-59.txt
+[Output directory]   	/home/valentin/phototaxis_analyzer_v3/example/
+[Period]             	Both
+[Header]             	1
+[Data number]        	5
+[Data starting point]	8.0
+[Data minute point]  	None
+[Plot point size]    	3
