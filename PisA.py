@@ -231,6 +231,7 @@ def openPress(button):
                 app.enableMenuItem("Settings", "Data minute point")
                 app.setLabel("Input", "\nInput: " + datasheet + "\n\nOutput: " + outputDirectory + "\n\nComparing plots:\n -> None")
         except:
+            app.errorBox("Error!", traceback.format_exc())
             datasheet = ""
             outputDirectory = ""
             app.disableMenuItem("PISA", "Start analysis")
@@ -416,9 +417,9 @@ def settingsPress(button):
         app.showSubWindow("Header")
 
     if(button == " Ok"):
-        app.hideSubWindow("Header")
         try:
             header = int(app.getEntry("Header"))
+            app.hideSubWindow("Header")
         except ValueError as ve:
             app.warningBox("Warning!", "The header must be an integer number!")
             app.setEntry("Header", header)
@@ -431,9 +432,9 @@ def settingsPress(button):
         app.showSubWindow("Start")
 
     if(button == "Ok "):
-        app.hideSubWindow("Start")
         try:
             startingPoint = float(app.getEntry("Data starting point"))
+            app.hideSubWindow("Start")
         except ValueError as ve:
             app.warningBox("Warning!", "The data starting point must be an integer or floating point number!")
             app.setEntry("Data starting point", startingPoint)
@@ -470,7 +471,7 @@ def plotData(dataNumber, minutePoint, period, startingPoint, pointSize):
     progressSize = len(columnNames) + len(comparePlots)
     dataPoints = dict()
     pdfOutput = PdfPages(outputDirectory + "".join(datasheet.split("/")[-1].split(".")[:-1]) + ".pdf")
-    timePoints = np.unique(data['h'] // 1 + startingPoint).astype(float)
+    timePoints = np.unique(data['h'] // 1 + startingPoint).astype(int)
     timePointLabels = np.unique((timePoints // 24).astype(int))
     days = np.arange(0, timePoints[-1], 24)
     maxPeriodNumber = timePointLabels[-1]
@@ -503,7 +504,7 @@ def plotData(dataNumber, minutePoint, period, startingPoint, pointSize):
         plt.xticks(days, timePointLabels)
         plt.xlabel("Days")
         plt.ylabel("mV")
-        threshold = (maxVoltage - minVoltage) * 0.1
+        threshold = (maxVoltage - minVoltage) * 0.05
         lastValley = None
         lastPeak = None
         minimumPhaseList = list()
@@ -543,13 +544,16 @@ def plotData(dataNumber, minutePoint, period, startingPoint, pointSize):
                 if(lastValley != None):
                     bottomLine = minVoltage - (maxVoltage - minVoltage) * 0.1
                     plt.plot([meanTime, lastValley], [bottomLine, bottomLine], color='k', linestyle='-')
-                    plt.annotate("{:.1f}".format(meanTime-lastValley) + "h", xy=((meanTime+lastValley)/2, 0.04), xycoords=('data','axes fraction'), size=10, ha='center')
-                    minimumPeriodList.append("{:.1f}".format(meanTime-lastValley))
+                    plt.annotate(str(meanTime-lastValley) + "h", xy=((meanTime+lastValley)/2, 0.04), xycoords=('data','axes fraction'), size=10, ha='center')
+                    minimumPeriodList.append(str(meanTime-lastValley))
+                    #plt.annotate("{:.1f}".format(meanTime-lastValley) + "h", xy=((meanTime+lastValley)/2, 0.04), xycoords=('data','axes fraction'), size=10, ha='center')
+                    #minimumPeriodList.append("{:.1f}".format(meanTime-lastValley))
 
                 top = minVoltage - (maxVoltage - minVoltage) * 0.15
                 bottom = minVoltage - (maxVoltage - minVoltage) * 0.05
                 plt.plot([meanTime, meanTime], [top, bottom], color='k', linestyle='-')
-                minimumPhaseList.append("{:.1f}".format(meanTime%24) + ";" + str(meanValley))
+                minimumPhaseList.append(str(meanTime%24) + ";" + str(meanValley))
+                #minimumPhaseList.append("{:.1f}".format(meanTime%24) + ";" + str(meanValley))
                 lastValley = meanTime
             if(len(peaks) and (period == "Maximum" or period == "Both")):
                 peak = None
@@ -563,13 +567,16 @@ def plotData(dataNumber, minutePoint, period, startingPoint, pointSize):
                 if(lastPeak != None):
                     topLine = maxVoltage + (maxVoltage - minVoltage) * 0.1
                     plt.plot([meanTime, lastPeak], [topLine, topLine], color='k', linestyle='-')
-                    plt.annotate("{:.1f}".format(meanTime-lastPeak) + "h", xy=((meanTime+lastPeak)/2, 0.93), xycoords=('data','axes fraction'), size=10, ha='center')
-                    maximumPeriodList.append("{:.1f}".format(meanTime-lastPeak))
+                    plt.annotate(str(meanTime-lastPeak) + "h", xy=((meanTime+lastPeak)/2, 0.93), xycoords=('data','axes fraction'), size=10, ha='center')
+                    maximumPeriodList.append(str(meanTime-lastPeak))
+                    #plt.annotate("{:.1f}".format(meanTime-lastPeak) + "h", xy=((meanTime+lastPeak)/2, 0.93), xycoords=('data','axes fraction'), size=10, ha='center')
+                    #maximumPeriodList.append("{:.1f}".format(meanTime-lastPeak))
 
                 top = maxVoltage + (maxVoltage - minVoltage) * 0.15
                 bottom = maxVoltage + (maxVoltage - minVoltage) * 0.05
                 plt.plot([meanTime, meanTime], [top, bottom], color='k', linestyle='-')
-                maximumPhaseList.append("{:.1f}".format(meanTime%24) + ";" + str(meanValley))
+                maximumPhaseList.append(str(meanTime%24) + ";" + str(meanValley))
+                #maximumPhaseList.append("{:.1f}".format(meanTime%24) + ";" + str(meanValley))
                 lastPeak = meanTime
 
         if(period == "Minimum"):
@@ -727,7 +734,7 @@ def calculatePeakAndValleyMean(x, y, point, threshold, mode):
                 pointsList.append(rightY[i])
                 indexList.append(point+i)
     
-    meanX = np.mean(np.take(x, indexList))
+    meanX = int(np.mean(np.take(x, indexList)))
     meanY = np.mean(np.array(pointsList))
     return (meanX, meanY)
 
