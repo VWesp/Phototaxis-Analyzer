@@ -573,7 +573,7 @@ def plotData(dataNumber, minutePoint, period, startingPoint, pointSize):
             periodList.append(sample + ";" + ";".join(maximumPeriodList))
         else:
             periodList.append(sample + ";" + ";".join(minimumPeriodList) + ";"*(maxPeriodNumber-len(minimumPeriodList)+2) + sample + ";" + ";".join(maximumPeriodList))
-            samplePhaseList = itertools.zip_longest(minimumPhaseList, maximumPhaseList, fillvalue='--')
+            samplePhaseList = itertools.zip_longest(minimumPhaseList, maximumPhaseList, fillvalue='--;--')
             for samplePhase in samplePhaseList:
                 phaseList.append(sample + ";" + (";;" + sample + ";").join(samplePhase))
                 sample = ""
