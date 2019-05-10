@@ -1,0 +1,12 @@
+Traceback (most recent call last):
+  File "PisA.py", line 717, in <module>
+    buildAppJarGUI()
+  File "PisA.py", line 57, in buildAppJarGUI
+    app.addMenuList("PisA", pisaMenus, pisaMenus)
+  File "/home/valentin/anaconda3/lib/python3.6/site-packages/appJar/appjar.py", line 10280, in addMenuList
+    self.addMenuItem(menuName, t, u)
+  File "/home/valentin/anaconda3/lib/python3.6/site-packages/appJar/appjar.py", line 10176, in addMenuItem
+    u = self.MAKE_FUNC(func, item)
+  File "/home/valentin/anaconda3/lib/python3.6/site-packages/appJar/appjar.py", line 3563, in MAKE_FUNC
+    raise Exception("Invalid function: " + str(funcName))
+Exception: Invalid function: Start analysis

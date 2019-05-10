@@ -53,30 +53,37 @@ def buildAppJarGUI():
     app.addMenuList("File", inputMenus, openPress)
 
     pisaMenus = ["Start analysis", "Cancel analysis", "-", "Compare columns", "Remove comparing columns"]
-    app.createMenu("PISA")
-    app.addMenuList("PISA", pisaMenus, pisaPress)
-    app.addMenuSeparator("PISA")
-    app.addSubMenu("PISA", "Set period")
+    app.createMenu("PisA")
+    app.addMenuList("PisA", pisaMenus, pisaPress)
+    app.addMenuSeparator("PisA")
+    app.addSubMenu("PisA", "Set period")
     app.addMenuRadioButton("Set period", "Period", "Minimum")
     app.addMenuRadioButton("Set period", "Period", "Maximum")
     app.addMenuRadioButton("Set period", "Period", "Both")
     app.setMenuRadioButton("Set period", "Period", "Minimum")
-    app.disableMenuItem("PISA", "Start analysis")
-    app.disableMenuItem("PISA", "Cancel analysis")
-    app.disableMenuItem("PISA", "Compare columns")
-    app.disableMenuItem("PISA", "Remove comparing columns")
+    app.addMenuSeparator("PisA")
+    app.addMenuItem("PisA", "Settings ", pisaPress)
+    app.disableMenuItem("PisA", "Start analysis")
+    app.disableMenuItem("PisA", "Cancel analysis")
+    app.disableMenuItem("PisA", "Compare columns")
+    app.disableMenuItem("PisA", "Remove comparing columns")
+    app.disableMenuItem("PisA", "Set period")
+    app.disableMenuItem("PisA", "Settings ")
 
     app.createMenu("Settings")
-    app.addMenuItem("Settings", "Header", settingsPress)
+    app.addMenuItem("Settings", "Header", fileSettingsPress)
     with app.subWindow("Header"):
         app.setBg("silver", override=True)
         app.setFont(size=12, underline=False, slant="roman")
         app.startFrame("HeaderTop", row=0, column=0)
-        app.addLabelEntry("Header")
+        app.addHorizontalSeparator()
+        app.addLabel("Header", "Header")
+        app.addNumericEntry("Header")
         app.setEntry("Header", 1)
+        app.addHorizontalSeparator()
         app.stopFrame()
         app.startFrame("HeaderBottom", row=1, column=0)
-        app.addButtons([" Ok", " Cancel"], settingsPress)
+        app.addButtons([" Ok", " Cancel"], fileSettingsPress)
         app.stopFrame()
 
     app.addSubMenu("Settings", "Plot point size")
@@ -85,27 +92,10 @@ def buildAppJarGUI():
 
     app.setMenuRadioButton("Plot point size", "Sizes", 3)
     app.addMenuSeparator("Settings")
-    app.addSubMenu("Settings", "Data number")
-    app.addMenuItem("Settings", "Data starting point", settingsPress)
-    with app.subWindow("Start"):
-        app.setBg("silver", override=True)
-        app.setFont(size=12, underline=False, slant="roman")
-        app.startFrame("StartTop", row=0, column=0)
-        app.addLabelEntry("Data starting point")
-        app.setEntry("Data starting point", 8)
-        app.stopFrame()
-        app.startFrame("StartBottom", row=1, column=0)
-        app.addButtons(["Ok ", "Cancel "], settingsPress)
-        app.stopFrame()
-
-    app.addSubMenu("Settings", "Data minute point")
-    app.addMenuSeparator("Settings")
-    app.addMenuItem("Settings", "Reset settings", settingsPress)
-    app.disableMenuItem("Settings", "Data number")
-    app.disableMenuItem("Settings", "Data minute point")
+    app.addMenuItem("Settings", "Reset settings", fileSettingsPress)
 
     app.createMenu("Exit")
-    app.addMenuItem("Exit", "Exit PISA", exitPress)
+    app.addMenuItem("Exit", "Exit PisA", exitPress)
 
     app.addMeter("Progress")
     app.setMeterFill("Progress", "forestgreen")
@@ -121,6 +111,33 @@ def buildAppJarGUI():
     app.setResizable(canResize=False)
     app.winIcon = None
 
+
+
+def buildAnalysisSettingsWindow(dataNumberOptions=[], dataMinuteOptions=[]):
+    
+    with app.subWindow("Analysis settings"):
+        app.setBg("silver", override=True)
+        app.setFont(size=12, underline=False, slant="roman")
+        app.startFrame("SettingsTop", row=0, column=0)
+        app.addHorizontalSeparator()
+        app.addLabel("Data starting point", "Data starting point")
+        app.addNumericEntry("Data starting point")
+        app.setEntry("Data starting point", 8)
+        app.addHorizontalSeparator()
+        app.addLabel("Data number", "Data number")
+        app.addOptionBox("Data number", dataNumberOptions)
+        app.setOptionBox("Data number", 5, callFunction=False)
+        app.addHorizontalSeparator()
+        app.addLabel("Data minute point", "Data minute point")
+        app.addOptionBox("Data minute point", dataMinuteOptions)
+        app.setOptionBox("Data minute point", "None", callFunction=False)
+        app.addHorizontalSeparator()
+        app.stopFrame()
+        app.startFrame("SettingsBottom", row=1, column=0)
+        app.addButtons([" Ok ", " Reset "], analysisSettingsPress)
+        app.stopFrame()
+        
+        
 
 def openPress(button):
 
@@ -138,25 +155,13 @@ def openPress(button):
         try:
             inputFile = app.openBox(title="Input datasheet file", fileTypes=[("datasheet files", "*.txt"), ("all files", "*.*")])
             if(inputFile != None and len(inputFile)):
-                try:
-                    header = int(app.getEntry("Header"))
-                except ValueError as ve:
-                    app.warningBox("Warning!", "The header must be an integer number!")
-                    return
-
+                header = int(app.getEntry("Header"))
                 app.setLabel("Input", "\nInput: Loading file...\n\nOutput: " + outputDirectory + "\n\nComparing plots:\n -> None")
                 if(datasheet != ""):
                     app.destroySubWindow("Compare columns")
                     app.destroySubWindow("Remove comparing columns")
-                    if(len(comparePlots)):
-                        app.disableMenuItem("PISA", "Remove comparing columns")
-                    
-                    for dataPoint in range(0, dataPerMeasurement):
-                        app.widgetManager.get(app.Widgets.Menu, "Data number").delete(0)
-
-                    app.widgetManager.get(app.Widgets.Menu, "Data minute point").delete("None")
-                    for minutePoint in range(len(np.unique(dataMinutePoints))):
-                        app.widgetManager.get(app.Widgets.Menu, "Data minute point").delete(0)
+                    app.destroySubWindow("Analysis settings")
+                    app.disableMenuItem("PisA", "Remove comparing columns")
 
                 datasheet = inputFile
                 del columnNames[:]
@@ -174,16 +179,7 @@ def openPress(button):
                         dataMinutePoints = (60 * (data[key] % 1)).astype(int)
 
                 dataInt.clear()
-                app.addMenuRadioButton("Data number", "Numbers", "All")
-                for dataPoint in range(1, dataPerMeasurement):
-                    app.addMenuRadioButton("Data number", "Numbers", dataPoint)
-
-                app.setMenuRadioButton("Data number", "Numbers", 5)
-                app.addMenuRadioButton("Data minute point", "Minutes", "None")
-                for minutePoint in np.unique(dataMinutePoints):
-                    app.addMenuRadioButton("Data minute point", "Minutes", minutePoint)
-
-                app.setMenuRadioButton("Data minute point", "Minutes", "None")
+                buildAnalysisSettingsWindow(["All"]+list(range(1, dataPerMeasurement)), ["None"]+list(np.unique(dataMinutePoints)))
                 with app.subWindow("Compare columns"):
                     app.setBg("silver", override=True)
                     app.setFont(size=12, underline=False, slant="roman")
@@ -192,12 +188,12 @@ def openPress(button):
                     app.stopFrame()
                     app.startFrame("CENTER", row=1, column=0)
                     columnNames = list(data.keys())[2:]
-                    column = 1
-                    for row in range(len(columnNames)):
-                        if(row != 0 and row % 6 == 0):
-                            column += 1
+                    row = 1
+                    for column in range(len(columnNames)):
+                        if(column != 0 and column % 6 == 0):
+                            row += 1
 
-                        app.addCheckBox(columnNames[row], column, row % 6)
+                        app.addCheckBox(columnNames[column], row, column % 6)
 
                     app.stopFrame()
                     app.startFrame("BOTTOM", row=2, column=0)
@@ -225,19 +221,19 @@ def openPress(button):
                 else:
                     outputDirectory = "/".join(os.path.abspath(datasheet).split("/")[:-1]) + "/"
 
-                app.enableMenuItem("PISA", "Start analysis")
-                app.enableMenuItem("PISA", "Compare columns")
-                app.enableMenuItem("Settings", "Data number")
-                app.enableMenuItem("Settings", "Data minute point")
+                app.enableMenuItem("PisA", "Start analysis")
+                app.enableMenuItem("PisA", "Compare columns")
+                app.enableMenuItem("PisA", "Set period")
+                app.enableMenuItem("PisA", "Settings ")
                 app.setLabel("Input", "\nInput: " + datasheet + "\n\nOutput: " + outputDirectory + "\n\nComparing plots:\n -> None")
         except:
             app.errorBox("Error!", traceback.format_exc())
             datasheet = ""
             outputDirectory = ""
-            app.disableMenuItem("PISA", "Start analysis")
-            app.disableMenuItem("PISA", "Compare columns")
-            app.disableMenuItem("Settings", "Data number")
-            app.disableMenuItem("Settings", "Data minute point")
+            app.disableMenuItem("PisA", "Start analysis")
+            app.disableMenuItem("PisA", "Compare columns")
+            app.disableMenuItem("PisA", "Set period")
+            app.disableMenuItem("PisA", "Settings ")
             app.setLabel("Input", "\nInput: Error loading! Check input file!\n\nOutput: " + outputDirectory + "\n\nComparing plots:\n -> None")
 
     if(button == "Save"):
@@ -257,32 +253,30 @@ def pisaPress(button):
     if(button == "Start analysis"):
         app.disableMenuItem("File", "Open")
         app.disableMenuItem("File", "Save")
-        app.disableMenuItem("PISA", "Start analysis")
-        app.enableMenuItem("PISA", "Cancel analysis")
-        app.disableMenuItem("PISA", "Compare columns")
-        app.disableMenuItem("PISA", "Remove comparing columns")
-        app.disableMenuItem("PISA", "Set period")
+        app.disableMenuItem("PisA", "Start analysis")
+        app.enableMenuItem("PisA", "Cancel analysis")
+        app.disableMenuItem("PisA", "Compare columns")
+        app.disableMenuItem("PisA", "Remove comparing columns")
+        app.disableMenuItem("PisA", "Set period")
+        app.disableMenuItem("PisA", "Settings ")
         app.disableMenuItem("Settings", "Header")
         app.disableMenuItem("Settings", "Plot point size")
-        app.disableMenuItem("Settings", "Data number")
-        app.disableMenuItem("Settings", "Data starting point")
-        app.disableMenuItem("Settings", "Data minute point")
         app.disableMenuItem("Settings", "Reset settings")
 
-        dataNumber = app.getMenuRadioButton("Data number", "Numbers")
+        dataNumber = app.getOptionBox("Data number")
         if(dataNumber == "All"):
             dataNumber = 0
         else:
             dataNumber = int(dataNumber)
 
-        minutePoint = app.getMenuRadioButton("Data minute point", "Minutes")
+        minutePoint = app.getOptionBox("Data minute point")
         if(minutePoint != "None"):
             minutePoint = int(minutePoint)
 
         period = app.getMenuRadioButton("Set period", "Period")
-        startingPoint = float(app.getEntry("Data starting point"))
+        startingPoint = app.getEntry("Data starting point")
         pointSize = int(app.getMenuRadioButton("Plot point size", "Sizes"))
-
+        
         finished = False
         cancelAnalysis = False
         app.thread(plotData, dataNumber, minutePoint, period, startingPoint, pointSize)
@@ -294,7 +288,7 @@ def pisaPress(button):
                     log += "[Output directory]" + " "*(space-len("[Output directory]")) + "\t" + outputDirectory + "\n"
                     log += "[Period]" + " "*(space-len("[Period]")) + "\t" + period + "\n"
                     log += "[Header]" + " "*(space-len("[Header]")) + "\t" + str(header) + "\n"
-                    log += "[Data number]" + " "*(space-len("[Data number]")) + "\t" + app.getMenuRadioButton("Data number", "Numbers") + "\n"
+                    log += "[Data number]" + " "*(space-len("[Data number]")) + "\t" + app.getOptionBox("Data number") + "\n"
                     log += "[Data starting point]" + " "*(space-len("[Data starting point]")) + "\t" + str(startingPoint) + "\n"
                     log += "[Data minute point]" + " "*(space-len("[Data minute point]")) + "\t" + str(minutePoint) + "\n"
                     log += "[Plot point size]" + " "*(space-len("[Plot point size]")) + "\t" + str(pointSize) + "\n"
@@ -314,18 +308,16 @@ def pisaPress(button):
 
         app.enableMenuItem("File", "Open")
         app.enableMenuItem("File", "Save")
-        app.enableMenuItem("PISA", "Start analysis")
-        app.disableMenuItem("PISA", "Cancel analysis")
-        app.enableMenuItem("PISA", "Compare columns")
-        app.enableMenuItem("PISA", "Set period")
+        app.enableMenuItem("PisA", "Start analysis")
+        app.disableMenuItem("PisA", "Cancel analysis")
+        app.enableMenuItem("PisA", "Compare columns")
+        app.enableMenuItem("PisA", "Set period")
+        app.enableMenuItem("PisA", "Settings ")
         app.enableMenuItem("Settings", "Header")
         app.enableMenuItem("Settings", "Plot point size")
-        app.enableMenuItem("Settings", "Data number")
-        app.enableMenuItem("Settings", "Data starting point")
-        app.enableMenuItem("Settings", "Data minute point")
         app.enableMenuItem("Settings", "Reset settings")
         if(len(comparePlots)):
-            app.enableMenuItem("PISA", "Remove comparing columns")
+            app.enableMenuItem("PisA", "Remove comparing columns")
 
     if(button == "Cancel analysis"):
         cancelAnalysis = True
@@ -335,6 +327,10 @@ def pisaPress(button):
 
     if(button == "Remove comparing columns"):
         app.showSubWindow("Remove comparing columns")
+        
+    if(button == "Settings "):
+        print("click")
+        app.showSubWindow("Analysis settings")
 
 
 
@@ -350,7 +346,7 @@ def columnsPress(button):
                 checklist.append(check)
 
         if(len(checklist)):
-            app.enableMenuItem("PISA", "Remove comparing columns")
+            app.enableMenuItem("PisA", "Remove comparing columns")
             checkPlots = " - ".join(checklist)
             if(not checkPlots in comparePlots):
                 comparePlots.append(checkPlots)
@@ -376,7 +372,7 @@ def columnsPress(button):
             app.setLabel("Input", "\nInput: " + datasheet + "\n\nOutput: " + outputDirectory + "\n\nComparing plots:\n -> " + "\n -> ".join(comparePlots))
         else:
             app.setLabel("Input", "\nInput: " + datasheet + "\n\nOutput: " + outputDirectory + "\n\nComparing plots:\n -> None")
-            app.disableMenuItem("PISA", "Remove comparing columns")
+            app.disableMenuItem("PisA", "Remove comparing columns")
 
         app.hideSubWindow("Remove comparing columns")
 
@@ -405,10 +401,22 @@ def doubleClickRemove():
     if(len(lbrPlot)):
         app.addListItem("Removable plots", lbrPlot)
         app.removeListItem("Removing plots", lbrPlot)
+        
+   
+        
+def analysisSettingsPress(button):
+    
+    if(button == " Ok "):
+        app.hideSubWindow("Analysis settings")
+        
+    if(button == " Reset "):
+        app.setEntry("Data starting point", 8)
+        app.setOptionBox("Data number", 5, callFunction=False)
+        app.setOptionBox("Data minute point", "None", callFunction=False)
 
 
 
-def settingsPress(button):
+def fileSettingsPress(button):
 
     global header
     global startingPoint
@@ -417,39 +425,17 @@ def settingsPress(button):
         app.showSubWindow("Header")
 
     if(button == " Ok"):
-        try:
-            header = int(app.getEntry("Header"))
-            app.hideSubWindow("Header")
-        except ValueError as ve:
-            app.warningBox("Warning!", "The header must be an integer number!")
-            app.setEntry("Header", header)
+        header = int(app.getEntry("Header"))
+        app.hideSubWindow("Header")
 
     if(button == " Cancel"):
         app.hideSubWindow("Header")
         app.setEntry("Header", header)
 
-    if(button == "Data starting point"):
-        app.showSubWindow("Start")
-
-    if(button == "Ok "):
-        try:
-            startingPoint = float(app.getEntry("Data starting point"))
-            app.hideSubWindow("Start")
-        except ValueError as ve:
-            app.warningBox("Warning!", "The data starting point must be an integer or floating point number!")
-            app.setEntry("Data starting point", startingPoint)
-
-    if(button == "Cancel "):
-        app.hideSubWindow("Start")
-        app.setEntry("Data starting point", startingPoint)
-
     if(button == "Reset settings"):
-        app.setEntry("Header", 1)
+        header = 1
+        app.setEntry("Header", header)
         app.setMenuRadioButton("Plot point size", "Sizes", 3)
-        app.setEntry("Data starting point", 8)
-        if(datasheet != ""):
-            app.setMenuRadioButton("Data number", "Numbers", 5)
-            app.setMenuRadioButton("Data minute point", "Minutes", "None")
 
 
 
@@ -457,7 +443,7 @@ def exitPress(button):
 
     global exitApp
 
-    if(button == "Exit PISA"):
+    if(button == "Exit PisA"):
         exitApp = True
         app.stop()
 
