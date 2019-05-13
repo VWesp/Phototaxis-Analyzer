@@ -4,6 +4,7 @@
 import argparse
 import os
 import sys
+import shutil
 import subprocess
 import pandas as pd
 import numpy as np
@@ -16,6 +17,9 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.patches as mpatches
 import itertools
+import multiprocessing as mp
+from functools import partial
+from PyPDF2 import PdfFileMerger
 from appJar import gui
 from tkinter import *
 
@@ -245,7 +249,7 @@ def openPress(button):
 
 
 def pisaPress(button):
-
+    
     global comparePlots
     global finished
     global cancelAnalysis
@@ -277,35 +281,65 @@ def pisaPress(button):
         startingPoint = app.getEntry("Data starting point")
         pointSize = int(app.getMenuRadioButton("Plot point size", "Sizes"))
         
-        finished = False
-        cancelAnalysis = False
-        app.thread(plotData, dataNumber, minutePoint, period, startingPoint, pointSize)
-        while(not exitApp and not cancelAnalysis):
-            if(finished):
-                with open(outputDirectory + "plotLog.txt", "w") as logWriter:
-                    space = len("[Data starting point]")
-                    log = "[Datasheet file]" + " "*(space-len("[Datasheet file]")) + "\t" + datasheet + "\n"
-                    log += "[Output directory]" + " "*(space-len("[Output directory]")) + "\t" + outputDirectory + "\n"
-                    log += "[Period]" + " "*(space-len("[Period]")) + "\t" + period + "\n"
-                    log += "[Header]" + " "*(space-len("[Header]")) + "\t" + str(header) + "\n"
-                    log += "[Data number]" + " "*(space-len("[Data number]")) + "\t" + app.getOptionBox("Data number") + "\n"
-                    log += "[Data starting point]" + " "*(space-len("[Data starting point]")) + "\t" + str(startingPoint) + "\n"
-                    log += "[Data minute point]" + " "*(space-len("[Data minute point]")) + "\t" + str(minutePoint) + "\n"
-                    log += "[Plot point size]" + " "*(space-len("[Plot point size]")) + "\t" + str(pointSize) + "\n"
-                    if(len(comparePlots)):
-                        log += "[Compared plots]" + " "*(space-len("[Compared plots]")) + "\n" + "\n".join(comparePlots)
-
-                    logWriter.write(log)
-
-                if(os.name == "nt"):
-                    os.startfile(outputDirectory)
-                else:
-                    subprocess.call(["xdg-open", outputDirectory])
-
+        merger = PdfFileMerger()
+        os.makedirs(outputDirectory + "tmp")
+        progress.value = 0
+        progressSize = len(columnNames) + len(comparePlots)
+        pool = mp.Pool(processes=mp.cpu_count())
+        poolMap =  partial(plotData, dataNumber=dataNumber, minutePoint=minutePoint, period=period, startingPoint=startingPoint, pointSize=pointSize)
+        pages = pool.map_async(poolMap, columnNames)
+        pool.close()
+        while(progress.value != progressSize):
+            if(cancelAnalysis or exitApp):
+                pool.terminate()
                 break
-
+            
+            app.setMeter("Progress", (progress.value/progressSize)*100)
             app.topLevel.update()
-
+        
+        pool.join()
+        if(not (cancelAnalysis or exitApp)):
+            app.setMeter("Progress", (progress.value/progressSize)*100)
+            plotResults = pages.get()
+            minimumPhaseList = list()
+            maximumPhaseList = list()
+            minimumPeriodList = list()
+            maximumPeriodList = list()
+            for sample in columnNames:
+                sampleResults = next(list(page.values()) for page in plotResults if sample == list(page.keys())[0])[0]
+                samplePage = sampleResults[0]
+                minimumPhaseList.append(sample + ";" + "\n".join(sampleResults[1]))
+                maximumPhaseList.append(sample + ";" + "\n".join(sampleResults[2]))
+                minimumPeriodList.append(sample + ";" + ";".join(sampleResults[3]))
+                maximumPeriodList.append(sample  + ";"+ ";".join(sampleResults[4]))
+                merger.append(samplePage)
+            
+            merger.write(outputDirectory + "".join(datasheet.split("/")[-1].split(".")[:-1]) + ".pdf")
+            if(period == "Minimum"):
+                with open(outputDirectory + "phaseLog.csv", "w") as phaseWriter:
+                    phaseWriter.write("\n".join(minimumPhaseList))
+                
+                with open(outputDirectory + "periodLog.csv", "w") as phaseWriter:
+                    phaseWriter.write("\n".join(minimumPeriodList))
+            elif(period == "Maximum"):
+                with open(outputDirectory + "phaseLog.csv", "w") as phaseWriter:
+                    phaseWriter.write("\n".join(maximumPhaseList))
+                
+                with open(outputDirectory + "periodLog.csv", "w") as phaseWriter:
+                    phaseWriter.write("\n".join(maximumPeriodList))
+            else:
+                with open(outputDirectory + "phaseLog.csv", "w") as phaseWriter:
+                    pass
+                
+                with open(outputDirectory + "periodLog.csv", "w") as phaseWriter:
+                    pass
+                
+            if(os.name == "nt"):
+                os.startfile(outputDirectory)
+            else:
+                subprocess.call(["xdg-open", outputDirectory])
+            
+        shutil.rmtree(outputDirectory + "tmp", ignore_errors=True)
         app.enableMenuItem("File", "Open")
         app.enableMenuItem("File", "Save")
         app.enableMenuItem("PisA", "Start analysis")
@@ -318,7 +352,8 @@ def pisaPress(button):
         app.enableMenuItem("Settings", "Reset settings")
         if(len(comparePlots)):
             app.enableMenuItem("PisA", "Remove comparing columns")
-
+            
+        cancelAnalysis = False
     if(button == "Cancel analysis"):
         cancelAnalysis = True
 
@@ -329,7 +364,6 @@ def pisaPress(button):
         app.showSubWindow("Remove comparing columns")
         
     if(button == "Settings "):
-        print("click")
         app.showSubWindow("Analysis settings")
 
 
@@ -449,7 +483,113 @@ def exitPress(button):
 
 
 
-def plotData(dataNumber, minutePoint, period, startingPoint, pointSize):
+def plotData(sample, dataNumber, minutePoint, period, startingPoint, pointSize):
+    
+    timePoints = np.unique(data['h'] // 1 + startingPoint).astype(int)
+    timePointLabels = np.unique((timePoints // 24).astype(int))
+    days = np.arange(0, timePoints[-1], 24)
+    minuteIndices = None
+    if(minutePoint != "None"):
+        minuteIndex = np.where(dataMinutePoints == minutePoint)[0][0]
+        minuteIndices = np.arange(minuteIndex, len(data['h']), dataPerMeasurement)
+        
+    minimumPhaseList = list()
+    maximumPhaseList = list()
+    minimumPeriodList = list()
+    maximumPeriodList = list()
+    maxVoltage = np.amax(data[sample])
+    minVoltage = np.amin(data[sample])
+    sampleData_invertMean = None
+    if(minutePoint != "None"):
+        sampleData_mean = np.take(np.array(data[sample]), minuteIndices)
+        sampleData_invertMean = (maxVoltage + minVoltage) - sampleData_mean
+    else:
+        sampleData_invert = np.array(np.split((maxVoltage+minVoltage)-data[sample], timePointIndices))
+        sampleData_invertMean = np.mean(sampleData_invert[:,-dataNumber:], axis=1)
+        
+    dataPoints = signal.savgol_filter(sampleData_invertMean, 11, 3)
+    
+    figure = plt.figure()
+    plt.plot(timePoints, dataPoints, marker='o', markersize=pointSize, color='k', linestyle='-')
+    plt.title(sample + "\n" + datasheet.split("/")[-1])
+    plt.xticks(days, timePointLabels)
+    plt.xlabel("Days")
+    plt.ylabel("mV")
+    threshold = (maxVoltage - minVoltage) * 0.05
+    lastValley = None
+    lastPeak = None
+    for day in days:
+        dayStart = day - 2
+        dayEnd = day + 26
+        if(day == 0):
+            dayStart =int(startingPoint)
+        else:
+            if(period == "Minimum"):
+                plt.axvline(day, ymin=0.1, color='k', linestyle=':')
+            elif(period == "Maximum"):
+                plt.axvline(day, ymax=0.9, color='k', linestyle=':')
+            elif(period == "Both"):
+                plt.axvline(day, ymin=0.1, ymax=0.9, color='k', linestyle=':')
+
+        if(not dayEnd in timePoints):
+            dayEnd = timePoints[-1]
+
+        timeIndexStart = np.where(timePoints == dayStart)[0][0]
+        timeIndexEnd = np.where(timePoints == dayEnd)[0][0]
+        daySample = dataPoints[timeIndexStart:timeIndexEnd]
+        dayTimePoints = timePoints[timeIndexStart:timeIndexEnd]
+        valleys, peaks = findPeaksAndValleys(daySample)
+        if(len(valleys) and (period == "Minimum" or period == "Both")):
+            valley = None
+            smallestValley = sys.float_info.max
+            for i in valleys:
+                if(daySample[i] <= smallestValley):
+                    smallestValley = daySample[i]
+                    valley = i
+            
+            meanTime, meanValley = calculatePeakAndValleyMean(dayTimePoints, daySample, valley, threshold, "min")
+            if(lastValley != None):
+                bottomLine = minVoltage - (maxVoltage - minVoltage) * 0.1
+                plt.plot([meanTime, lastValley], [bottomLine, bottomLine], color='k', linestyle='-')
+                plt.annotate(str(meanTime-lastValley) + "h", xy=((meanTime+lastValley)/2, 0.04), xycoords=('data','axes fraction'), size=10, ha='center')
+                minimumPeriodList.append(str(meanTime-lastValley))
+                
+            top = minVoltage - (maxVoltage - minVoltage) * 0.15
+            bottom = minVoltage - (maxVoltage - minVoltage) * 0.05
+            plt.plot([meanTime, meanTime], [top, bottom], color='k', linestyle='-')
+            minimumPhaseList.append(str(meanTime%24) + ";" + str(meanValley))
+            lastValley = meanTime
+        if(len(peaks) and (period == "Maximum" or period == "Both")):
+            peak = None
+            highestPeak = 0
+            for i in peaks:
+                if(daySample[i] > highestPeak):
+                    highestPeak = daySample[i]
+                    peak = i
+            
+            meanTime, meanPeak = calculatePeakAndValleyMean(dayTimePoints, daySample, peak, threshold, "max")
+            if(lastPeak != None):
+                topLine = maxVoltage + (maxVoltage - minVoltage) * 0.1
+                plt.plot([meanTime, lastPeak], [topLine, topLine], color='k', linestyle='-')
+                plt.annotate(str(meanTime-lastPeak) + "h", xy=((meanTime+lastPeak)/2, 0.93), xycoords=('data','axes fraction'), size=10, ha='center')
+                maximumPeriodList.append(str(meanTime-lastPeak))
+                
+            top = maxVoltage + (maxVoltage - minVoltage) * 0.15
+            bottom = maxVoltage + (maxVoltage - minVoltage) * 0.05
+            plt.plot([meanTime, meanTime], [top, bottom], color='k', linestyle='-')
+            maximumPhaseList.append(str(meanTime%24) + ";" + str(meanPeak))
+            lastPeak = meanTime
+            
+    figure.savefig(outputDirectory + "tmp/" + sample + ".pdf", bbox_inches='tight')
+    plt.close()
+    with progress.get_lock():
+        progress.value += 1
+        
+    return ({sample: [outputDirectory + "tmp/" + sample + ".pdf", minimumPhaseList, maximumPhaseList, minimumPeriodList, maximumPeriodList]})
+
+    
+
+def plotData_t(dataNumber, minutePoint, period, startingPoint, pointSize):
 
     global finished
 
@@ -655,15 +795,15 @@ def plotData(dataNumber, minutePoint, period, startingPoint, pointSize):
 
 
 
-def findPeaksAndValleys(array, points=1):
+def findPeaksAndValleys(y, points=1):
     
     valleys = list()
     peaks = list()
-    if(len(array) > points*2):
-        for i in range(points, len(array)-points, 1):
+    if(len(y) > points*2):
+        for i in range(points, len(y)-points, 1):
             valleyFound = True
             for j in range(1, points+1, 1):
-                if(array[i] > array[i-j] or array[i] > array[i+j]):
+                if(y[i] > y[i-j] or y[i] > y[i+j]):
                     valleyFound = False
                     break
             
@@ -672,7 +812,7 @@ def findPeaksAndValleys(array, points=1):
                 
             peakFound = True
             for j in range(1, points+1, 1):
-                if(array[i] < array[i-j] or array[i] < array[i+j]):
+                if(y[i] < y[i-j] or y[i] < y[i+j]):
                     peakFound = False
                     break
                 
@@ -728,6 +868,7 @@ def calculatePeakAndValleyMean(x, y, point, threshold, mode):
 
 if __name__ == '__main__':
     try:
+        progress = mp.Value('i', 0) 
         app.winIcon = None
         buildAppJarGUI()
         app.go()
