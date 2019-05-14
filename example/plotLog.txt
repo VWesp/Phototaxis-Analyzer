@@ -1,15 +1,20 @@
-[Datasheet file]     	/home/valentin/git/Phototaxis-Analyzer/example/PhT64_32_2019-04-30_11-09-59.txt
-[Output directory]   	/home/valentin/git/Phototaxis-Analyzer/example/
-[Period]             	Both
-[Header]             	1
-[Data number]        	5
-[Data starting point]	8.0
-[Data minute point]  	None
-[Plot point size]    	3
-[Compared plots]     
-1 - 2 - 3 - 4 - 5
-6 - 7 - 8 - 9 - 10
-11 - 12 - 13 - 14 - 15
-16 - 17 - 18 - 19 - 20
-21 - 22 - 23 - 24 - 25
-26 - 27 - 28 - 29 - 30 - 31
+[Datasheet file]         	/home/valentin/git/Phototaxis-Analyzer/example/PhT64_32_2019-04-30_11-09-59.txt
+[Output directory]       	/home/valentin/git/Phototaxis-Analyzer/example/
+[Header]                 	1
+[Plot point size]        	3
+[X-axis label]           	Days
+[Period]                 	Both
+[Data number]            	5
+[Data starting point [h]]	8.0
+[Data minute point [m]]  	None
+[SG-Filter]              	On
+  [Window size]            	11
+  [Polynomial order]       	3
+[Threads]                	4
+[Compared plots]         
+  1 - 2 - 3 - 4 - 5
+  6 - 7 - 8 - 9 - 10
+  11 - 12 - 13 - 14 - 15
+  16 - 17 - 18 - 19 - 20
+  21 - 22 - 23 - 24 - 25
+  26 - 27 - 28 - 29 - 30 - 31
