@@ -1,5 +1,5 @@
-[Datasheet file]         	/home/valentin/git/Phototaxis-Analyzer/example/PhT64_32_2019-04-30_11-09-59.txt
-[Output directory]       	/home/valentin/git/Phototaxis-Analyzer/example/
+[Datasheet file]         	PhT64_32_2019-04-30_11-09-59.txt
+[Output directory]       	/
 [Header]                 	1
 [Plot point size]        	3
 [X-axis label]           	Days
