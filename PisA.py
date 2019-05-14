@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 #Icon made by Smashicons (https://www.flaticon.com/authors/smashicons) from www.flaticon.com
 
-import argparse
 import os
 import sys
 import shutil
@@ -9,12 +8,10 @@ import subprocess
 import pandas as pd
 import numpy as np
 import scipy.signal as signal
-from scipy import interpolate
 import traceback
 import matplotlib
 matplotlib.use("PS")
 import matplotlib.pyplot as plt
-from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.patches as mpatches
 import itertools
 import multiprocessing as mp
@@ -45,6 +42,9 @@ app = gui("PisA", "380x360")
 
 
 def buildAppJarGUI():
+    
+    global lbc
+    global lbr
 
     app.setBg("silver", override=True)
     app.setFont(size=12, underline=False, slant="roman")
@@ -101,6 +101,23 @@ def buildAppJarGUI():
 
     app.createMenu("Exit")
     app.addMenuItem("Exit", "Exit PisA", exitPress)
+    
+    with app.subWindow("Remove comparing columns"):
+        app.setResizable(canResize=False)
+        app.setBg("silver", override=True)
+        app.setFont(size=12, underline=False, slant="roman")
+        app.startFrame(" TOP ", row=0, column=0)
+        app.addButtons(["Remove", "Cancel"], columnsPress)
+        app.stopFrame()
+        app.startFrame(" BOTTOM ", row=1, column=0)
+        app.addLabel("Removable plots", "Comparing plots")
+        lbc = app.addListBox("Removable plots")
+        lbc.bind("<Double-1>", lambda *args: doubleClickAdd())
+        app.addHorizontalSeparator()
+        app.addLabel("Removing plots", "Removing plots")
+        lbr = app.addListBox("Removing plots")
+        lbr.bind("<Double-1>", lambda *args: doubleClickRemove())
+        app.stopFrame()
     
     with app.subWindow("Advanced settings"):
         app.setResizable(canResize=False)
@@ -185,8 +202,6 @@ def openPress(button):
     global dataPerMeasurement
     global timePointIndices
     global dataMinutePoints
-    global lbc
-    global lbr
 
     if(button == "Open"):
         try:
@@ -200,7 +215,8 @@ def openPress(button):
                 built = False
                 if(datasheet != ""):
                     app.destroySubWindow("Compare columns")
-                    app.destroySubWindow("Remove comparing columns")
+                    app.clearListBox("Removable plots", callFunction=False)
+                    app.clearListBox("Removing plots", callFunction=False)
                     app.disableMenuItem("PisA", "Remove comparing columns")
                     built = True
 
@@ -220,7 +236,6 @@ def openPress(button):
                         dataMinutePoints = (60 * (data[key] % 1)).astype(int)
 
                 dataInt.clear()
-                buildAnalysisSettingsWindow(["All"]+list(range(1, dataPerMeasurement)), ["None"]+list(np.unique(dataMinutePoints)), built)
                 with app.subWindow("Compare columns"):
                     app.setResizable(canResize=False)
                     app.setBg("silver", override=True)
@@ -241,24 +256,38 @@ def openPress(button):
                     app.startFrame("BOTTOM", row=2, column=0)
                     app.addButton("Close", columnsPress)
                     app.stopFrame()
-
-                with app.subWindow("Remove comparing columns"):
-                    app.setResizable(canResize=False)
-                    app.setBg("silver", override=True)
-                    app.setFont(size=12, underline=False, slant="roman")
-                    app.startFrame(" TOP ", row=0, column=0)
-                    app.addButtons(["Remove", "Cancel"], columnsPress)
-                    app.stopFrame()
-                    app.startFrame(" BOTTOM ", row=1, column=0)
-                    app.addLabel("Removable plots", "Comparing plots")
-                    lbc = app.addListBox("Removable plots")
-                    lbc.bind("<Double-1>", lambda *args: doubleClickAdd())
-                    app.addHorizontalSeparator()
-                    app.addLabel("Removing plots", "Removing plots")
-                    lbr = app.addListBox("Removing plots")
-                    lbr.bind("<Double-1>", lambda *args: doubleClickRemove())
-                    app.stopFrame()
-
+                
+                if(not built):
+                    with app.subWindow("Analysis settings"):
+                        app.setResizable(canResize=False)
+                        app.setBg("silver", override=True)
+                        app.setFont(size=12, underline=False, slant="roman")
+                        app.startFrame("SettingsTop", row=0, column=0)
+                        app.addHorizontalSeparator()
+                        app.addLabel("Data starting point", "Data starting point [h]")
+                        app.addNumericEntry("Data starting point")
+                        app.setEntry("Data starting point", 8)
+                        app.addHorizontalSeparator()
+                        app.addLabel("Data number", "Data number")
+                        app.addOptionBox("Data number", ["All"]+list(range(1, dataPerMeasurement)))
+                        app.setOptionBox("Data number", 5, callFunction=False)
+                        app.addHorizontalSeparator()
+                        app.addLabel("Data minute point", "Data minute point [m]")
+                        app.addOptionBox("Data minute point", ["None"]+list(np.unique(dataMinutePoints)))
+                        app.setOptionBox("Data minute point", "None", callFunction=False)
+                        app.addHorizontalSeparator()
+                        app.addLabelSpinBox(" Label ", ["Days", "Hours"])
+                        app.addHorizontalSeparator()
+                        app.addLabelSpinBox(" SG-Filter ", ["On", "Off"])
+                        app.addHorizontalSeparator()
+                        app.stopFrame()
+                        app.startFrame("SettingsBottom", row=1, column=0)
+                        app.addButtons([" Ok ", "Advanced", " Reset "], analysisSettingsPress)
+                        app.stopFrame()
+                else:
+                    app.changeOptionBox("Data number", ["All"]+list(range(1, dataPerMeasurement)), 5)
+                    app.changeOptionBox("Data minute point", ["None"]+list(np.unique(dataMinutePoints)), "None")
+                
                 if(os.name == "nt"):
                     outputDirectory = "/".join(os.path.abspath(datasheet).split("\\")[:-1]) + "/"
                 else:
