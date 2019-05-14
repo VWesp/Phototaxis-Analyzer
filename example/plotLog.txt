@@ -1,5 +1,5 @@
-[Datasheet file]     	PhT64_32_2019-04-30_11-09-59.txt
-[Output directory]   	/
+[Datasheet file]     	/home/valentin/git/Phototaxis-Analyzer/example/PhT64_32_2019-04-30_11-09-59.txt
+[Output directory]   	/home/valentin/git/Phototaxis-Analyzer/example/
 [Period]             	Both
 [Header]             	1
 [Data number]        	5
