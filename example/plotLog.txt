@@ -7,7 +7,7 @@
 [Data number]            	5
 [Data starting point [h]]	8.0
 [Data minute point [m]]  	None
-[SG-Filter]              	On
+[SG-Filter]              	Off
   [Window size]            	11
   [Polynomial order]       	3
 [Threads]                	4
