@@ -16,7 +16,8 @@ import matplotlib.patches as mpatches
 import itertools
 import multiprocessing as mp
 from functools import partial
-from PyPDF2 import PdfFileMerger
+from PyPDF2 import PdfFileMerger, PdfFileReader
+import stat
 from appJar import gui
 from tkinter import *
 
@@ -36,6 +37,8 @@ cancelAnalysis = None
 exitApp = False
 lbc = None
 lbr = None
+progress = None
+lock = None
 
 
 app = gui("PisA", "380x360")
@@ -354,7 +357,7 @@ def pisaPress(button):
         progress.value = 0
         progressSize = len(columnNames) + len(comparePlots)
         pool = mp.Pool(processes=threads)
-        poolMap = partial(plotData, data=data, outputDirectory=outputDirectory, dataNumber=dataNumber, minutePoint=minutePoint, dataPerMeasurement=dataPerMeasurement, dataMinutePoints=dataMinutePoints, timePointIndices=timePointIndices, sgFilter=sgFilter, windowSize=windowSize, polyOrder=polyOrder, period=period, startingPoint=startingPoint, pointSize=pointSize, label=label)
+        poolMap = partial(plotData, progress=progress, lock=lock, data=data, outputDirectory=outputDirectory, dataNumber=dataNumber, minutePoint=minutePoint, dataPerMeasurement=dataPerMeasurement, dataMinutePoints=dataMinutePoints, timePointIndices=timePointIndices, sgFilter=sgFilter, windowSize=windowSize, polyOrder=polyOrder, period=period, startingPoint=startingPoint, pointSize=pointSize, label=label)
         pages = pool.map_async(poolMap, columnNames)
         pool.close()
         while(progress.value != len(columnNames)):
@@ -371,7 +374,7 @@ def pisaPress(button):
         os.makedirs(outputDirectory + "tmpCompare")
         if(len(comparePlots) and not cancelAnalysis):
             pool = mp.Pool(processes=threads)
-            poolMap =  partial(plotComparePlots, plotList=pages.get(), outputDirectory=outputDirectory, pointSize=pointSize)
+            poolMap =  partial(plotComparePlots, progress=progress, lock=lock, plotList=pages.get(), data=data, outputDirectory=outputDirectory, startingPoint=startingPoint, pointSize=pointSize, label=label)
             compareResults = pool.map_async(poolMap, comparePlots)
             pool.close()
             while(progress.value != len(columnNames) + len(comparePlots)):
@@ -405,6 +408,7 @@ def pisaPress(button):
                 merger.append(samplePage)
             
             merger.write(outputDirectory + "".join(datasheet.split("/")[-1].split(".")[:-1]) + ".pdf")
+            merger.close()
             if(len(comparePlots)):
                 compareMerger = PdfFileMerger()
                 for samples in comparePlots:
@@ -412,7 +416,7 @@ def pisaPress(button):
                     compareMerger.append(samplesPage)
             
                 compareMerger.write(outputDirectory + "".join(datasheet.split("/")[-1].split(".")[:-1]) + "_compared.pdf")
-                
+                compareMerger.close()
             if(period == "Minimum"):
                 with open(outputDirectory + "phaseLog.csv", "w") as phaseWriter:
                     phaseWriter.write("Minima\nSample;Phase [h];milliVolt [mV]\n" + "\n".join(minimumPhaseList))
@@ -472,13 +476,13 @@ def pisaPress(button):
             del maximumPhaseList[:]
             del minimumPeriodList[:]
             del maximumPeriodList[:]
+            shutil.rmtree(outputDirectory + "tmp", ignore_errors=True)
+            shutil.rmtree(outputDirectory + "tmpCompare", ignore_errors=True)
             if(os.name == "nt"):
                 os.startfile(outputDirectory)
             else:
                 subprocess.call(["xdg-open", outputDirectory])
-        
-        shutil.rmtree(outputDirectory + "tmp", ignore_errors=True)
-        shutil.rmtree(outputDirectory + "tmpCompare", ignore_errors=True)
+                
         app.enableMenuItem("File", "Open")
         app.enableMenuItem("File", "Save")
         app.enableMenuItem("PisA", "Start analysis")
@@ -492,6 +496,10 @@ def pisaPress(button):
         app.enableMenuItem("Exit", "Exit PisA")
         if(len(comparePlots)):
             app.enableMenuItem("PisA", "Remove comparing columns")
+            
+        if(cancelAnalysis):
+            shutil.rmtree(outputDirectory + "tmp", ignore_errors=True)
+            shutil.rmtree(outputDirectory + "tmpCompare", ignore_errors=True)
             
         cancelAnalysis = False
     if(button == "Cancel analysis"):
@@ -638,7 +646,7 @@ def exitPress(button):
 
 
 
-def plotData(sample, data, outputDirectory, dataNumber, minutePoint, dataPerMeasurement, dataMinutePoints, timePointIndices, sgFilter, windowSize, polyOrder, period, startingPoint, pointSize, label):
+def plotData(sample, progress, lock, data, outputDirectory, dataNumber, minutePoint, dataPerMeasurement, dataMinutePoints, timePointIndices, sgFilter, windowSize, polyOrder, period, startingPoint, pointSize, label):
     
     timePoints = np.unique(data["h"] // 1 + startingPoint).astype(float)
     timePointLabels = None
@@ -722,13 +730,13 @@ def plotData(sample, data, outputDirectory, dataNumber, minutePoint, dataPerMeas
                 if(lastValley != None):
                     bottomLine = minVoltage - (maxVoltage - minVoltage) * 0.1
                     plt.plot([meanTime, lastValley], [bottomLine, bottomLine], color="k", linestyle="-")
-                    plt.annotate("{:.1f}".format(meanTime-lastValley) + "h", xy=((meanTime+lastValley)/2, 0.04), xycoords=("data","axes fraction"), size=10, ha="center")
-                    minimumPeriodList.append("{:.1f}".format(meanTime-lastValley))
+                    plt.annotate("{:.1f}".format(meanTime-lastValley).replace(".", ",") + "h", xy=((meanTime+lastValley)/2, 0.04), xycoords=("data","axes fraction"), size=10, ha="center")
+                    minimumPeriodList.append("{:.1f}".format(meanTime-lastValley).replace(".", ","))
                     
                 top = minVoltage - (maxVoltage - minVoltage) * 0.15
                 bottom = minVoltage - (maxVoltage - minVoltage) * 0.05
                 plt.plot([meanTime, meanTime], [top, bottom], color="k", linestyle="-")
-                minimumPhaseList.append("{:.1f}".format(meanTime%24) + ";" + str(meanValley))
+                minimumPhaseList.append("{:.1f}".format(meanTime%24).replace(".", ",") + ";" + str(meanValley).replace(".", ","))
                 lastValley = meanTime
         if(len(peaks) and (period == "Maximum" or period == "Both")):
             if(day != 0):
@@ -750,13 +758,13 @@ def plotData(sample, data, outputDirectory, dataNumber, minutePoint, dataPerMeas
                 if(lastPeak != None):
                     topLine = maxVoltage + (maxVoltage - minVoltage) * 0.1
                     plt.plot([meanTime, lastPeak], [topLine, topLine], color="k", linestyle="-")
-                    plt.annotate("{:.1f}".format(meanTime-lastPeak) + "h", xy=((meanTime+lastPeak)/2, 0.93), xycoords=("data","axes fraction"), size=10, ha="center")
-                    maximumPeriodList.append("{:.1f}".format(meanTime-lastPeak))
+                    plt.annotate("{:.1f}".format(meanTime-lastPeak).replace(".", ",") + "h", xy=((meanTime+lastPeak)/2, 0.93), xycoords=("data","axes fraction"), size=10, ha="center")
+                    maximumPeriodList.append("{:.1f}".format(meanTime-lastPeak).replace(".", ","))
                     
                 top = maxVoltage + (maxVoltage - minVoltage) * 0.15
                 bottom = maxVoltage + (maxVoltage - minVoltage) * 0.05
                 plt.plot([meanTime, meanTime], [top, bottom], color="k", linestyle="-")
-                maximumPhaseList.append("{:.1f}".format(meanTime%24) + ";" + str(meanPeak))
+                maximumPhaseList.append("{:.1f}".format(meanTime%24).replace(".", ",") + ";" + str(meanPeak).replace(".", ","))
                 lastPeak = meanTime
             
     figure.savefig(outputDirectory + "tmp/" + sample + ".pdf", bbox_inches="tight")
@@ -768,7 +776,7 @@ def plotData(sample, data, outputDirectory, dataNumber, minutePoint, dataPerMeas
 
 
 
-def plotComparePlots(sampleList, plotList, outputDirectory, pointSize):
+def plotComparePlots(sampleList, progress, lock, plotList, data, outputDirectory, startingPoint, pointSize, label):
     
     colorList = ("k", "b", "g", "r", "c", "m", "y")
     samples = sampleList.split(" - ")
@@ -776,8 +784,13 @@ def plotComparePlots(sampleList, plotList, outputDirectory, pointSize):
     colorIndex = 0
     firstPlot = True
     timePoints = np.unique(data["h"] // 1 + startingPoint).astype(int)
-    timePointLabels = np.unique((timePoints // 24).astype(int))
+    timePointLabels = None
     days = np.arange(0, timePoints[-1], 24)
+    if(label == "Days"):
+        timePointLabels = np.unique((timePoints // 24).astype(int))
+    elif(label == "Hours"):
+        timePointLabels = days
+        
     figure = plt.figure()
     for sample in samples:
         plot = next(list(page.values()) for page in plotList if sample == list(page.keys())[0])[0][0]
@@ -788,7 +801,7 @@ def plotComparePlots(sampleList, plotList, outputDirectory, pointSize):
         if(firstPlot):
             plt.title(sampleList + "\n" + datasheet.split("/")[-1])
             plt.xticks(days, timePointLabels)
-            plt.xlabel("Days")
+            plt.xlabel(label)
             plt.ylabel("mV")
             for day in days:
                 if(day in timePoints):
