@@ -5,7 +5,7 @@
 [X-axis label]           	Days
 [Period]                 	Both
 [Data number]            	5
-[Data starting point [h]]	8.0
+[Data starting point [h]]	12.0
 [Data minute point [m]]  	None
 [SG-Filter]              	Off
   [Window size]            	11
