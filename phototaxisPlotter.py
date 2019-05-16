@@ -10,9 +10,9 @@ def plotData(sample, progress, lock, data, datasheet, outputDirectory, dataNumbe
         
     timePoints = np.unique(data["h"] // 1 + startingPoint).astype(float)
     timePointLabels = None
-    days = np.arange(0, timePoints[-1], 24)
+    days = np.arange(0, timePoints[-1], 24).astype(int)
     if(label == "Days"):
-        timePointLabels = np.unique((timePoints // 24).astype(int))
+        timePointLabels = np.unique((timePoints // 24)).astype(int)
     elif(label == "Hours"):
         timePointLabels = days
         

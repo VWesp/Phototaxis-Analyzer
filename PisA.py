@@ -328,23 +328,29 @@ if __name__ == "__main__":
                 polyOrder = 3
             else:
                 polyOrder = int(polyOrder)
-                
+            
+            checkFailed = False
             if(int(windowSize) % 2 == 0 or int(windowSize) <= int(polyOrder)):
                 app.warningBox("Filter warning", "Window size of the SG-Filter must be a positive odd integer and larger than the order of the polynomial!")
-                app.enableMenuItem("File", "Open")
-                app.enableMenuItem("File", "Save")
-                app.enableMenuItem("PisA", "Start analysis")
-                app.disableMenuItem("PisA", "Cancel analysis")
-                app.enableMenuItem("PisA", "Compare columns")
-                app.enableMenuItem("PisA", "Set period")
-                app.enableMenuItem("PisA", "Settings ")
-                app.enableMenuItem("Settings", "Header")
-                app.enableMenuItem("Settings", "Plot point size")
-                app.enableMenuItem("Settings", "Reset settings")
-                app.enableMenuItem("Exit", "Exit PisA")
-                if(len(comparePlots)):
-                    app.enableMenuItem("PisA", "Remove comparing columns")
-                    
+                checkFailed = True
+            
+            elif(not os.access(outputDirectory, os.W_OK | os.R_OK | os.X_OK)):
+                app.warningBox("Output folder warning", "The output folder is not accessible! Please make sure that it exist and is accessible!")
+                checkFailed = True
+            else:
+                outputList = ["".join(datasheet.split("/")[-1].split(".")[:-1]) + ".pdf", "".join(datasheet.split("/")[-1].split(".")[:-1]) + "_compared.pdf", "phaseLog.csv", "periodLog.csv", "plotLog.csv"]
+                for outputFile in outputList:
+                    if(os.path.exists(outputDirectory + outputFile)):
+                        try:
+                            with open(outputDirectory + outputFile, "w") as fileReader:
+                                pass
+                        except PermissionError:
+                            app.warningBox("Output file warning", "The output file '" + outputFile + "' is not accessible! Please make sure that it is closed!")
+                            checkFailed = True
+                            break
+            
+            if(checkFailed):
+                enableMenus()    
                 return
             
             threads = int(app.getSpinBox(" Threads "))
@@ -403,50 +409,80 @@ if __name__ == "__main__":
                     
                     merger.append(samplePage)
                 
-                merger.write(outputDirectory + "".join(datasheet.split("/")[-1].split(".")[:-1]) + ".pdf")
+                outputFile = outputDirectory + "".join(datasheet.split("/")[-1].split(".")[:-1])
+                if(os.path.exists(outputFile + ".pdf")):
+                    try:
+                        with open(outputFile + ".pdf", "w") as fileReader:
+                            pass
+                    except PermissionError:
+                        app.warningBox("Output file warning", "The output file '" + "".join(datasheet.split("/")[-1].split(".")[:-1]) + ".pdf" + "' is not accessible! Please make sure that it is closed and restart the analysis!")
+                        shutil.rmtree(outputDirectory + "tmp", ignore_errors=True)
+                        shutil.rmtree(outputDirectory + "tmpCompare", ignore_errors=True)
+                        enableMenus() 
+                        return
+                
+                merger.write(outputFile + ".pdf")
                 merger.close()
                 if(len(comparePlots)):
                     compareMerger = PdfFileMerger()
                     for samples in comparePlots:
                         samplesPage = next(list(page.values()) for page in compareResults.get() if samples == list(page.keys())[0])[0]
                         compareMerger.append(samplesPage)
-                
-                    compareMerger.write(outputDirectory + "".join(datasheet.split("/")[-1].split(".")[:-1]) + "_compared.pdf")
+                    
+                    if(os.path.exists(outputFile + "_compared.pdf")):
+                        try:
+                            with open(outputFile + "_compared.pdf", "w") as fileReader:
+                                pass
+                        except PermissionError:
+                            app.warningBox("Output file warning", "The output file '" + "".join(datasheet.split("/")[-1].split(".")[:-1]) + "_compared.pdf" + "' is not accessible! Please make sure that it is closed and restart the analysis!")
+                            shutil.rmtree(outputDirectory + "tmp", ignore_errors=True)
+                            shutil.rmtree(outputDirectory + "tmpCompare", ignore_errors=True)
+                            enableMenus() 
+                            return
+                        
+                    compareMerger.write(outputFile + "_compared.pdf")
                     compareMerger.close()
-                if(period == "Minimum"):
-                    with open(outputDirectory + "phaseLog.csv", "w") as phaseWriter:
-                        phaseWriter.write("Minima\nSample;Phase [h];milliVolt [mV]\n" + "\n".join(minimumPhaseList))
-                    
-                    with open(outputDirectory + "periodLog.csv", "w") as periodWriter:
-                        periodWriter.write("Minima\nSample;Period [h]\n" + "\n".join(minimumPeriodList))
-                elif(period == "Maximum"):
-                    with open(outputDirectory + "phaseLog.csv", "w") as phaseWriter:
-                        phaseWriter.write("Maxima\nSample;Phase [h];milliVolt [mV]\n" + "\n".join(maximumPhaseList))
-                    
-                    with open(outputDirectory + "periodLog.csv", "w") as periodWriter:
-                        periodWriter.write("Maxima\nSample;Period [h]\n" + "\n".join(maximumPeriodList))
-                else:
-                    with open(outputDirectory + "phaseLog.csv", "w") as phaseWriter:
-                        phaseList = list()
-                        for listIndex in range(len(minimumPhaseList)):
-                            insideMinimumPhaseList = minimumPhaseList[listIndex].split("\n")
-                            insideMaximumPhaseList = maximumPhaseList[listIndex].split("\n")
-                            mergedLists = list(itertools.zip_longest(insideMinimumPhaseList, insideMaximumPhaseList, fillvalue=";--;--"))
-                            for mergedList in mergedLists:
-                                phaseList.append(";;".join(mergedList))
-                                
-                        phaseWriter.write("Minima;;;;Maxima\nSample;Phase [h];milliVolt [mV];;Sample;Phase [h];milliVolt [mV]\n" + "\n".join(phaseList))
-                        del phaseList[:]
+                try:
+                    if(period == "Minimum"):
+                        with open(outputDirectory + "phaseLog.csv", "w") as phaseWriter:
+                            phaseWriter.write("Minima\nSample;Phase [h];milliVolt [mV]\n" + "\n".join(minimumPhaseList))
                         
-                    with open(outputDirectory + "periodLog.csv", "w") as periodWriter:
-                        periodList = list()
-                        for listIndex in range(len(minimumPeriodList)):
-                            insideMinimumPeriodList = minimumPeriodList[listIndex].split(";")
-                            insideMaximumPeriodList = maximumPeriodList[listIndex].split(";")
-                            periodList.append(";".join(insideMinimumPeriodList) + ";;" + ";"*(maxMinimumPeriodLength-len(insideMinimumPeriodList)) + ";".join(insideMaximumPeriodList))
+                        with open(outputDirectory + "periodLog.csv", "w") as periodWriter:
+                            periodWriter.write("Minima\nSample;Period [h]\n" + "\n".join(minimumPeriodList))
+                    elif(period == "Maximum"):
+                        with open(outputDirectory + "phaseLog.csv", "w") as phaseWriter:
+                            phaseWriter.write("Maxima\nSample;Phase [h];milliVolt [mV]\n" + "\n".join(maximumPhaseList))
                         
-                        periodWriter.write("Minima;;" + ";"*(maxMinimumPeriodLength-1) + "Maxima\nSample;Period [h];" + ";"*(maxMinimumPeriodLength-1) + "Sample;Period [h]\n" + "\n".join(periodList))
-                        del periodList[:]
+                        with open(outputDirectory + "periodLog.csv", "w") as periodWriter:
+                            periodWriter.write("Maxima\nSample;Period [h]\n" + "\n".join(maximumPeriodList))
+                    else:
+                        with open(outputDirectory + "phaseLog.csv", "w") as phaseWriter:
+                            phaseList = list()
+                            for listIndex in range(len(minimumPhaseList)):
+                                insideMinimumPhaseList = minimumPhaseList[listIndex].split("\n")
+                                insideMaximumPhaseList = maximumPhaseList[listIndex].split("\n")
+                                mergedLists = list(itertools.zip_longest(insideMinimumPhaseList, insideMaximumPhaseList, fillvalue=";--;--"))
+                                for mergedList in mergedLists:
+                                    phaseList.append(";;".join(mergedList))
+                                    
+                            phaseWriter.write("Minima;;;;Maxima\nSample;Phase [h];milliVolt [mV];;Sample;Phase [h];milliVolt [mV]\n" + "\n".join(phaseList))
+                            del phaseList[:]
+                            
+                        with open(outputDirectory + "periodLog.csv", "w") as periodWriter:
+                            periodList = list()
+                            for listIndex in range(len(minimumPeriodList)):
+                                insideMinimumPeriodList = minimumPeriodList[listIndex].split(";")
+                                insideMaximumPeriodList = maximumPeriodList[listIndex].split(";")
+                                periodList.append(";".join(insideMinimumPeriodList) + ";;" + ";"*(maxMinimumPeriodLength-len(insideMinimumPeriodList)) + ";".join(insideMaximumPeriodList))
+                            
+                            periodWriter.write("Minima;;" + ";"*(maxMinimumPeriodLength-1) + "Maxima\nSample;Period [h];" + ";"*(maxMinimumPeriodLength-1) + "Sample;Period [h]\n" + "\n".join(periodList))
+                            del periodList[:]
+                except PermissionError:
+                    app.warningBox("Output file warning", "The output file 'phaseLog.csv' or 'periodLog.csv' is not accessible! Please make sure that they are closed and restart the analysis!")
+                    shutil.rmtree(outputDirectory + "tmp", ignore_errors=True)
+                    shutil.rmtree(outputDirectory + "tmpCompare", ignore_errors=True)
+                    enableMenus() 
+                    return
                         
                 with open(outputDirectory + "plotLog.txt", "w") as logWriter:
                     space = len("[Data starting point [h]]")
@@ -479,20 +515,7 @@ if __name__ == "__main__":
                 else:
                     subprocess.call(["xdg-open", outputDirectory])
                     
-            app.enableMenuItem("File", "Open")
-            app.enableMenuItem("File", "Save")
-            app.enableMenuItem("PisA", "Start analysis")
-            app.disableMenuItem("PisA", "Cancel analysis")
-            app.enableMenuItem("PisA", "Compare columns")
-            app.enableMenuItem("PisA", "Set period")
-            app.enableMenuItem("PisA", "Settings ")
-            app.enableMenuItem("Settings", "Header")
-            app.enableMenuItem("Settings", "Plot point size")
-            app.enableMenuItem("Settings", "Reset settings")
-            app.enableMenuItem("Exit", "Exit PisA")
-            if(len(comparePlots)):
-                app.enableMenuItem("PisA", "Remove comparing columns")
-                
+            enableMenus()
             if(cancelAnalysis):
                 shutil.rmtree(outputDirectory + "tmp", ignore_errors=True)
                 shutil.rmtree(outputDirectory + "tmpCompare", ignore_errors=True)
@@ -594,6 +617,8 @@ if __name__ == "__main__":
             app.setEntry("Data starting point", 12)
             app.setOptionBox("Data number", 5, callFunction=False)
             app.setOptionBox("Data minute point", "None", callFunction=False)
+            app.setSpinBox(" Label ", "Days", callFunction=False)
+            app.setSpinBox(" SG-Filter ", "Off", callFunction=False)
 
 
 
@@ -639,6 +664,24 @@ if __name__ == "__main__":
         if(button == "Exit PisA"):
             exitApp = True
             app.stop()
+
+
+
+    def enableMenus():
+        
+        app.enableMenuItem("File", "Open")
+        app.enableMenuItem("File", "Save")
+        app.enableMenuItem("PisA", "Start analysis")
+        app.disableMenuItem("PisA", "Cancel analysis")
+        app.enableMenuItem("PisA", "Compare columns")
+        app.enableMenuItem("PisA", "Set period")
+        app.enableMenuItem("PisA", "Settings ")
+        app.enableMenuItem("Settings", "Header")
+        app.enableMenuItem("Settings", "Plot point size")
+        app.enableMenuItem("Settings", "Reset settings")
+        app.enableMenuItem("Exit", "Exit PisA")
+        if(len(comparePlots)):
+            app.enableMenuItem("PisA", "Remove comparing columns")
 
 
 
