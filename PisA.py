@@ -43,6 +43,7 @@ if __name__ == "__main__":
         app.setBg("silver", override=True)
         app.setFont(size=12, underline=False, slant="roman")
         app.setLocation(300, 250)
+        app.setIcon("icon/leaning-tower-of-pisa.gif")
         app.setFastStop(True)
         app.setResizable(canResize=False)
         app.winIcon = None
