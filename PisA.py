@@ -40,6 +40,7 @@ if __name__ == "__main__":
         global lbc
         global lbr
 
+        app.setTitle("PisA")
         app.setBg("silver", override=True)
         app.setFont(size=12, underline=False, slant="roman")
         app.setLocation(300, 250)
@@ -107,7 +108,6 @@ if __name__ == "__main__":
             app.setBg("silver", override=True)
             app.setFont(size=12, underline=False, slant="roman")
             app.startFrame("ComparingPlotsFrame", row=0, column=0)
-            app.addHorizontalSeparator()
             app.addLabel("Removable plots", "Comparing plots")
             lbc = app.addListBox("Removable plots")
             lbc.bind("<Double-1>", lambda *args: doubleClickAdd())
@@ -116,11 +116,12 @@ if __name__ == "__main__":
             app.addLabel("Removing plots", "Removing plots")
             lbr = app.addListBox("Removing plots")
             lbr.bind("<Double-1>", lambda *args: doubleClickRemove())
-            app.addHorizontalSeparator()
             app.stopFrame()
             app.startFrame("RemoveFrame", row=1, column=0)
-            app.addNamedButton("Remove", "RemoveOk", columnsPress, row=0, column=0)
-            app.addNamedButton("Cancel", "RemoveCancel", columnsPress, row=0, column=1)
+            app.addNamedButton("Remove", "RemoveOk", columnsPress)
+            app.stopFrame()
+            app.startFrame("CancelFrame", row=1, column=1)
+            app.addNamedButton("Cancel", "RemoveCancel", columnsPress)
             app.stopFrame()
 
         with app.subWindow("Analysis settings"):
