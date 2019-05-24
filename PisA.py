@@ -33,10 +33,10 @@ if __name__ == "__main__":
     progress = None
     lock = None
 
-    app = appJar.gui("PisA", "380x380")
+    app = appJar.gui("PisA", "380x400")
 
     def buildAppJarGUI():
-        
+
         global lbc
         global lbr
 
@@ -46,7 +46,7 @@ if __name__ == "__main__":
         app.setFastStop(True)
         app.setResizable(canResize=False)
         app.winIcon = None
-        
+
         app.startFrame("TitleFrame")
         app.addLabel("Title", "PisA: [P]hototax[is]-[A]nalyzer")
         app.setLabelBg("Title", "orangered")
@@ -76,14 +76,14 @@ if __name__ == "__main__":
 
         app.createMenu("Settings")
         app.addMenuItem("Settings", "Header", fileSettingsPress)
-        with app.subWindow("Header settings", modal=True):
-            app.setSize("150x70")
+        with app.subWindow("Header settings"):
             app.setResizable(canResize=False)
             app.setBg("silver", override=True)
             app.setFont(size=12, underline=False, slant="roman")
             app.startFrame("HeaderLabelFrame", row=0, column=0)
             app.addLabelEntry(" Header ")
             app.setEntry(" Header ", 1)
+            app.addEmptyLabel("HeaderFiller")
             app.stopFrame()
             app.startFrame("HeaderButtonsFrame", row=1, column=0)
             app.addNamedButton("Ok", "HeaderOk", fileSettingsPress, row=0, column=0)
@@ -100,8 +100,8 @@ if __name__ == "__main__":
 
         app.createMenu("Exit")
         app.addMenuItem("Exit", "Exit PisA", exitPress)
-        
-        with app.subWindow("Remove comparing columns", modal=True):
+
+        with app.subWindow("Remove comparing columns"):
             app.setResizable(canResize=False)
             app.setBg("silver", override=True)
             app.setFont(size=12, underline=False, slant="roman")
@@ -122,8 +122,7 @@ if __name__ == "__main__":
             app.addNamedButton("Cancel", "RemoveCancel", columnsPress, row=0, column=1)
             app.stopFrame()
 
-        with app.subWindow("Analysis settings", modal=True):
-            app.setSize("250x350")
+        with app.subWindow("Analysis settings"):
             app.setResizable(canResize=False)
             app.setBg("silver", override=True)
             app.setFont(size=12, underline=False, slant="roman")
@@ -144,7 +143,8 @@ if __name__ == "__main__":
             app.addRadioButton("Label", "Hours")
             app.addHorizontalSeparator()
             app.addEmptyLabel("AnalysisFiller4")
-            app.addCheckBox(" SG-Filter")
+            app.addCheckBox("SG-Filter")
+            app.addEmptyLabel("AnalysisFiller5")
             app.stopFrame()
             app.startFrame("AnalysisButtonsFrame", row=3, column=0)
             app.addNamedButton("Ok", "AnalysisOk", analysisSettingsPress, row=0, column=0)
@@ -152,8 +152,7 @@ if __name__ == "__main__":
             app.addNamedButton("Reset", "AnalysisReset", analysisSettingsPress, row=0, column=2)
             app.stopFrame()
 
-        with app.subWindow("Advanced settings", modal=True):
-            app.setSize("200x170")
+        with app.subWindow("Advanced settings"):
             app.setResizable(canResize=False)
             app.setBg("silver", override=True)
             app.setFont(size=12, underline=False, slant="roman")
@@ -165,15 +164,16 @@ if __name__ == "__main__":
             app.addLabelEntry(" Poly order ")
             app.setEntry(" Poly order ", 3)
             app.addHorizontalSeparator()
-            app.addEmptyLabel("AdvancedFiller")
+            app.addEmptyLabel("AdvancedFiller1")
             app.addLabelSpinBox(" Threads ", list(np.arange(1, mp.cpu_count()+1, 1)))
             app.setSpinBox(" Threads ", mp.cpu_count(), callFunction=False)
+            app.addEmptyLabel("AdvancedFiller2")
             app.stopFrame()
             app.startFrame("AdvancecButtonsFrame", row=1, column=0)
             app.addNamedButton("Ok", "AdvancedOk", advancedSettingsPress, row=0, column=0)
             app.addNamedButton("Reset", "AdvancedReset", advancedSettingsPress, row=0, column=1)
             app.stopFrame()
-        
+
         app.startFrame("MeterFrame")
         app.addSplitMeter("Progress")
         app.setMeterFill("Progress", ["forestgreen", "lavender"])
@@ -189,16 +189,16 @@ if __name__ == "__main__":
         app.addLabel("Output", " Output: ")
         app.setLabelAlign("Output", "left")
         app.addEmptyLabel("MainFiller3")
-        app.addLabel("Plots", " Comparing plots:\n  None")
+        app.addLabel("Plots", " Comparing plots:\n  {None}")
         app.setLabelAlign("Plots", "left")
         app.stopScrollPane()
         app.stopFrame()
-        
+
         app.startFrame("StatusFrame")
         app.addHorizontalSeparator()
         app.addStatusbar("Status")
         app.stopFrame()
-            
+
 
 
     def openPress(button):
@@ -231,7 +231,7 @@ if __name__ == "__main__":
 
                     app.setLabel("Input", " Input: ")
                     app.setLabel("Output", " Output: ")
-                    app.setLabel("Plots", " Comparing plots:\n  None")
+                    app.setLabel("Plots", " Comparing plots:\n  {None}")
                     app.setStatusbar("Loading input file")
                     if(datasheet != ""):
                         try:
@@ -259,7 +259,7 @@ if __name__ == "__main__":
                             dataMinutePoints = (60 * (data[key] % 1)).astype(int)
 
                     dataInt.clear()
-                    with app.subWindow("Compare columns", modal=True):
+                    with app.subWindow("Compare columns"):
                         app.setLocation(700, 300)
                         app.setResizable(canResize=False)
                         app.setBg("silver", override=True)
@@ -271,8 +271,8 @@ if __name__ == "__main__":
                             if(column != 0 and column % 6 == 0):
                                 row += 1
 
-                            app.addCheckBox(" " + columnNames[column], row, column % 6)
-                        
+                            app.addCheckBox(columnNames[column], row, column % 6)
+
                         app.addEmptyLabel("ColumnFiller")
                         app.stopFrame()
                         app.startFrame("CompareButtonsFrame", row=1, column=0)
@@ -293,7 +293,7 @@ if __name__ == "__main__":
                     app.enableMenuItem("PisA", "PisA Settings")
                     app.setLabel("Input", " Input: " + datasheet)
                     app.setLabel("Output", " Output: " + outputDirectory)
-                    app.setLabel("Plots", " Comparing plots:\n  None")
+                    app.setLabel("Plots", " Comparing plots:\n  {None}")
                     app.setStatusbar("Input file loaded")
             except Exception:
                 print(traceback.format_exc())
@@ -316,7 +316,7 @@ if __name__ == "__main__":
 
 
     def pisaPress(button):
-        
+
         global comparePlots
         global cancelAnalysis
 
@@ -333,6 +333,11 @@ if __name__ == "__main__":
             app.disableMenuItem("Settings", "Plot point size")
             app.disableMenuItem("Settings", "Reset settings")
             app.disableMenuItem("Exit", "Exit PisA")
+            app.hideSubWindow("Compare columns")
+            app.hideSubWindow("Remove comparing columns")
+            app.hideSubWindow("Analysis settings")
+            app.hideSubWindow("Advanced settings")
+            app.hideSubWindow("Header settings")
 
             dataNumber = app.getOptionBox("Data number")
             if(dataNumber == "All"):
@@ -355,10 +360,10 @@ if __name__ == "__main__":
                     app.warningBox("Value error", "The starting point has to be a positive integer or floating point number!")
                     enableMenus()
                     return
-                
+
             pointSize = int(app.getMenuRadioButton("Plot point size", "Sizes"))
             label = app.getRadioButton("Label")
-            sgFilter = app.getCheckBox(" SG-Filter")
+            sgFilter = app.getCheckBox("SG-Filter")
             windowSize = app.getEntry(" Window size ")
             if(not len(windowSize)):
                 windowSize = 11
@@ -371,7 +376,7 @@ if __name__ == "__main__":
                     app.warningBox("Value warning", "The window size has to be a positive integer number!")
                     enableMenus()
                     return
-            
+
             polyOrder = app.getEntry(" Poly order ")
             if(not len(polyOrder)):
                 polyOrder = 3
@@ -384,7 +389,7 @@ if __name__ == "__main__":
                     app.warningBox("Value warning", "The poly order has to be a positive integer number!")
                     enableMenus()
                     return
-            
+
             checkFailed = False
             if(int(windowSize) % 2 == 0 or int(windowSize) <= int(polyOrder)):
                 app.warningBox("Filter warning!", "Window size of the SG-Filter must be a positive odd integer" +
@@ -410,15 +415,15 @@ if __name__ == "__main__":
                                            "' is not accessible! Please make sure that it is closed!")
                             checkFailed = True
                             break
-            
+
             if(checkFailed):
-                enableMenus()    
+                enableMenus()
                 return
-            
+
             threads = int(app.getSpinBox(" Threads "))
             if(os.path.exists(outputDirectory + "tmp")):
                 shutil.rmtree(outputDirectory + "tmp", ignore_errors=True)
-                
+
             os.makedirs(outputDirectory + "tmp")
             progress.value = 0
             progressSize = len(columnNames) + len(comparePlots)
@@ -452,12 +457,12 @@ if __name__ == "__main__":
                     if(cancelAnalysis):
                         pool.terminate()
                         break
-                        
+
                     app.setMeter("Progress", (progress.value/progressSize)*100)
                     app.setStatusbar("Plotting datapoints - " +
                                      "{0:.2f}".format((progress.value/progressSize)*100) + " %")
                     app.topLevel.update()
-                
+
                 app.setMeter("Progress", (progress.value/progressSize)*100)
                 app.setStatusbar("Datapoints plotted - " +
                                  "{0:.2f}".format((progress.value/progressSize)*100) + " %")
@@ -465,7 +470,7 @@ if __name__ == "__main__":
                 compareResults = None
                 if(os.path.exists(outputDirectory + "tmpCompare")):
                     shutil.rmtree(outputDirectory + "tmpCompare", ignore_errors=True)
-                    
+
                 os.makedirs(outputDirectory + "tmpCompare")
                 if(len(comparePlots) and not cancelAnalysis):
                     app.setStatusbar("Comparing plots - " +
@@ -480,17 +485,17 @@ if __name__ == "__main__":
                         if(cancelAnalysis):
                             pool.terminate()
                             break
-                        
+
                         app.setMeter("Progress", (progress.value/progressSize)*100)
                         app.setStatusbar("Comparing plots - " +
                                          "{0:.2f}".format((progress.value/progressSize)*100) + " %")
                         app.topLevel.update()
-                    
+
                     app.setMeter("Progress", (progress.value/progressSize)*100)
                     app.setStatusbar("Plots compared - " +
                                      "{0:.2f}".format((progress.value/progressSize)*100) + " %")
                     pool.join()
-                
+
                 if(not cancelAnalysis):
                     minimumPhaseList = list()
                     maximumPhaseList = list()
@@ -508,9 +513,9 @@ if __name__ == "__main__":
                         maximumPeriodList.append(sample  + ";"+ ";".join(sampleResults[5]))
                         if(len(sampleResults[4]) >= maxMinimumPeriodLength):
                             maxMinimumPeriodLength = len(sampleResults[4]) + 1
-                        
+
                         merger.append(samplePage)
-                    
+
                     outputFile = outputDirectory + "".join(datasheet.split("/")[-1].split(".")[:-1])
                     if(os.path.exists(outputFile + ".pdf")):
                         try:
@@ -523,9 +528,9 @@ if __name__ == "__main__":
                                            " restart the analysis!")
                             shutil.rmtree(outputDirectory + "tmp", ignore_errors=True)
                             shutil.rmtree(outputDirectory + "tmpCompare", ignore_errors=True)
-                            enableMenus() 
+                            enableMenus()
                             return
-                    
+
                     merger.write(outputFile + ".pdf")
                     merger.close()
                     if(len(comparePlots)):
@@ -534,7 +539,7 @@ if __name__ == "__main__":
                             samplesPage = next(list(page.values()) for page in compareResults.get()
                                                     if samples == list(page.keys())[0])[0]
                             compareMerger.append(samplesPage)
-                        
+
                         if(os.path.exists(outputFile + "_compared.pdf")):
                             try:
                                 with open(outputFile + "_compared.pdf", "w") as fileReader:
@@ -546,9 +551,9 @@ if __name__ == "__main__":
                                                " restart the analysis!")
                                 shutil.rmtree(outputDirectory + "tmp", ignore_errors=True)
                                 shutil.rmtree(outputDirectory + "tmpCompare", ignore_errors=True)
-                                enableMenus() 
+                                enableMenus()
                                 return
-                            
+
                         compareMerger.write(outputFile + "_compared.pdf")
                         compareMerger.close()
                     try:
@@ -579,7 +584,7 @@ if __name__ == "__main__":
                                 phaseWriter.write("Minima;;;;Maxima\nSample;Phase [h];milliVolt [mV];;Sample;" +
                                 "Phase [h];milliVolt [mV]\n" + "\n".join(phaseList))
                                 del phaseList[:]
-                                
+
                             with open(outputDirectory + "periodLog.csv", "w") as periodWriter:
                                 periodList = list()
                                 for listIndex in range(len(minimumPeriodList)):
@@ -599,9 +604,9 @@ if __name__ == "__main__":
                                        " the analysis!")
                         shutil.rmtree(outputDirectory + "tmp", ignore_errors=True)
                         shutil.rmtree(outputDirectory + "tmpCompare", ignore_errors=True)
-                        enableMenus() 
+                        enableMenus()
                         return
-                            
+
                     with open(outputDirectory + "plotLog.txt", "w") as logWriter:
                         space = len("[Don't use suboptimal peak/valley threshold]")
                         logList = list()
@@ -641,13 +646,13 @@ if __name__ == "__main__":
                         os.startfile(outputDirectory)
                     else:
                         subprocess.call(["xdg-open", outputDirectory])
-                        
+
                 enableMenus()
                 if(cancelAnalysis):
                     app.setStatusbar("Analysis canceled")
                     shutil.rmtree(outputDirectory + "tmp", ignore_errors=True)
                     shutil.rmtree(outputDirectory + "tmpCompare", ignore_errors=True)
-                    
+
                 cancelAnalysis = False
             except Exception:
                 app.setStatusbar("Analysis error")
@@ -657,12 +662,12 @@ if __name__ == "__main__":
                 enableMenus()
                 if(os.path.exists(outputDirectory + "tmp")):
                     shutil.rmtree(outputDirectory + "tmp", ignore_errors=True)
-                    
+
                 if(os.path.exists(outputDirectory + "tmpCompare")):
                     shutil.rmtree(outputDirectory + "tmpCompare", ignore_errors=True)
-                    
+
                 cancelAnalysis = False
-                
+
         if(button == "Cancel analysis"):
             cancelAnalysis = True
 
@@ -671,7 +676,7 @@ if __name__ == "__main__":
 
         if(button == "Remove comparing columns"):
             app.showSubWindow("Remove comparing columns")
-            
+
         if(button == "PisA Settings"):
             app.showSubWindow("Analysis settings")
 
@@ -682,11 +687,10 @@ if __name__ == "__main__":
         global comparePlots
 
         if(button == "CompareSet"):
-            checkBoxes = app.getAllCheckBoxes()
             checklist = list()
-            for check in checkBoxes:
-                if(checkBoxes[check]):
-                    checklist.append(check)
+            for name in columnNames:
+                if(app.getCheckBox(name)):
+                    checklist.append(name)
 
             if(len(checklist)):
                 app.enableMenuItem("PisA", "Remove comparing columns")
@@ -700,6 +704,10 @@ if __name__ == "__main__":
             del checklist[:]
 
         if(button == "CompareClose"):
+            for name in columnNames:
+                if(app.getCheckBox(name)):
+                    app.setCheckBox(name, ticked=False, callFunction=False)
+
             app.hideSubWindow("Compare columns")
 
         if(button == "RemoveOk"):
@@ -711,7 +719,7 @@ if __name__ == "__main__":
             if(len(comparePlots)):
                 app.setLabel("Plots", " Comparing plots:\n  " + "\n  ".join(comparePlots))
             else:
-                app.setLabel("Plots", " Comparing plots:\n\n  None")
+                app.setLabel("Plots", " Comparing plots:\n  {None}")
                 app.disableMenuItem("PisA", "Remove comparing columns")
 
             app.hideSubWindow("Remove comparing columns")
@@ -741,30 +749,30 @@ if __name__ == "__main__":
         if(len(lbrPlot)):
             app.addListItem("Removable plots", lbrPlot)
             app.removeListItem("Removing plots", lbrPlot)
-            
-       
-            
+
+
+
     def analysisSettingsPress(button):
-        
+
         if(button == "AnalysisOk"):
             app.confirmHideSubWindow("Analysis settings")
-            
+
         if(button == "AnalysisAdvanced"):
             app.showSubWindow("Advanced settings")
-            
+
         if(button == "AnalysisReset"):
             app.setEntry(" Starting point ", 12)
             app.setOptionBox("Data number", 5, callFunction=False)
             app.setOptionBox("Data minute point", "None", callFunction=False)
             app.setRadioButton("Label", "Days", callFunction=False)
-            app.setCheckBox(" SG-Filter", ticked=False, callFunction=False)
+            app.setCheckBox("SG-Filter", ticked=False, callFunction=False)
 
 
     def advancedSettingsPress(button):
-        
+
         if(button == "AdvancedOk"):
             app.hideSubWindow("Advanced settings")
-        
+
         if(button == "AdvancedReset"):
             app.setEntry(" Window size ", 11)
             app.setEntry(" Poly order ", 3)
@@ -804,7 +812,7 @@ if __name__ == "__main__":
 
 
     def enableMenus():
-        
+
         app.enableMenuItem("File", "Open")
         app.enableMenuItem("File", "Save")
         app.enableMenuItem("PisA", "Start analysis")

@@ -26,13 +26,13 @@ def plotData(sample, progress, lock, data, datasheet, outputDirectory, dataNumbe
     else:
         sampleData_invert = np.array(np.split((maxVoltage+minVoltage)-data[sample], timePointIndices))
         sampleData_invertMean = np.mean(sampleData_invert[:,-dataNumber:], axis=1)
-    
+
     dataPoints = None
     if(sgFilter):
         dataPoints = signal.savgol_filter(sampleData_invertMean, windowSize, polyOrder)
     else:
         dataPoints = sampleData_invertMean
-    
+
     figure = plt.figure()
     plot = plt.plot(timePoints, dataPoints, marker="o", markersize=pointSize, color="k", linestyle="-")
     plt.title(sample + "\n" + datasheet.split("/")[-1])
@@ -66,9 +66,14 @@ def plotData(sample, progress, lock, data, datasheet, outputDirectory, dataNumbe
         valleys, peaks = findPeaksAndValleys(daySample, points)
         if(len(valleys) and (period == "Minimum" or period == "Both")):
             if(dayEnd != timePoints[-1]):
-                valleySample = np.take(daySample, valleys)
-                smallestValley = np.amin(valleySample)
-                valley = np.where(daySample == smallestValley)[0][0]
+                valley = None
+                smallestValley = sys.float_info.max
+                valleys.reverse()
+                for i in valleys:
+                    if(daySample[i] < smallestValley):
+                        smallestValley = daySample[i]
+                        valley = i
+
                 meanTime = None
                 meanValley = None
                 if(day == 0):
@@ -83,7 +88,7 @@ def plotData(sample, progress, lock, data, datasheet, outputDirectory, dataNumbe
                     plt.annotate(str(meanTime-lastValley).replace(".", ",") + "h", xy=((meanTime+lastValley)/2, 0.04),
                                  xycoords=("data","axes fraction"), size=10, ha="center")
                     minimumPeriodList.append(str(meanTime-lastValley).replace(".", ","))
-                    
+
                 top = minVoltage - (maxVoltage - minVoltage) * 0.15
                 bottom = minVoltage - (maxVoltage - minVoltage) * 0.05
                 plt.plot([meanTime, meanTime], [top, bottom], color="k", linestyle="-")
@@ -91,11 +96,13 @@ def plotData(sample, progress, lock, data, datasheet, outputDirectory, dataNumbe
                 lastValley = meanTime
         if(len(peaks) and (period == "Maximum" or period == "Both")):
             if(day != 0):
-                peakSample = np.take(daySample, peaks)
-                highestPeak = peakSample[np.where(peakSample == np.amax(peakSample))[0][0]]
-                peak = np.where(daySample == highestPeak)[0][0]
-                meanTime = None
-                meanPeak = None
+                peak = None
+                highestPeak = 0
+                for i in peaks:
+                    if(daySample[i] > highestPeak):
+                        highestPeak = daySample[i]
+                        peak = i
+
                 if(dayEnd == timePoints[-1]):
                     meanTime, meanPeak = calculatePeakAndValleyMean(dayTimePoints[points:], daySample[points:],
                                                                     peak-points, threshold, "max")
@@ -108,13 +115,13 @@ def plotData(sample, progress, lock, data, datasheet, outputDirectory, dataNumbe
                     plt.annotate(str(meanTime-lastPeak).replace(".", ",") + "h", xy=((meanTime+lastPeak)/2, 0.93),
                                  xycoords=("data","axes fraction"), size=10, ha="center")
                     maximumPeriodList.append(str(meanTime-lastPeak).replace(".", ","))
-                    
+
                 top = maxVoltage + (maxVoltage - minVoltage) * 0.15
                 bottom = maxVoltage + (maxVoltage - minVoltage) * 0.05
                 plt.plot([meanTime, meanTime], [top, bottom], color="k", linestyle="-")
                 maximumPhaseList.append(str(meanTime%24).replace(".", ",") + ";" + str(meanPeak).replace(".", ","))
                 lastPeak = meanTime
-            
+
     figure.savefig(outputDirectory + "tmp/" + sample + ".pdf", bbox_inches="tight")
     plt.close()
     with lock:
@@ -127,7 +134,7 @@ def plotData(sample, progress, lock, data, datasheet, outputDirectory, dataNumbe
 
 def plotComparePlots(sampleList, progress, lock, plotList, datasheet, outputDirectory, informationOfTime,
                      pointSize, label):
-                         
+
     colorList = ("k", "b", "g", "r", "c", "m", "y")
     samples = sampleList.split(" - ")
     patches = list()
@@ -163,17 +170,17 @@ def plotComparePlots(sampleList, progress, lock, plotList, datasheet, outputDire
     plt.legend(handles=patches, bbox_to_anchor=(1.05,0.5))
     figure.savefig(outputDirectory + "tmpCompare/" + sampleList + ".pdf", bbox_inches="tight")
     plt.close()
-    
+
     del patches[:]
     with lock:
         progress.value += 1
-        
+
     return {sampleList: outputDirectory + "tmpCompare/" + sampleList + ".pdf"}
 
 
 
 def findPeaksAndValleys(y, points):
-    
+
     valleys = list()
     peaks = list()
     if(len(y) > points*2):
@@ -183,16 +190,16 @@ def findPeaksAndValleys(y, points):
                 if(y[i] > y[i-j] or y[i] > y[i+j]):
                     valleyFound = False
                     break
-            
+
             if(valleyFound):
                 valleys.append(i)
-                
+
             peakFound = True
             for j in range(1, points+1, 1):
                 if(y[i] < y[i-j] or y[i] < y[i+j]):
                     peakFound = False
                     break
-                
+
             if(peakFound):
                 peaks.append(i)
 
@@ -201,7 +208,7 @@ def findPeaksAndValleys(y, points):
 
 
 def calculatePeakAndValleyMean(x, y, point, threshold, mode):
-    
+
     valueList = list()
     indexList = list()
     leftY = y[:point]
@@ -218,7 +225,7 @@ def calculatePeakAndValleyMean(x, y, point, threshold, mode):
             elif(y[point] >= leftY[i] >= y[point]-threshold):
                 valueList.append(leftY[i])
                 indexList.append(i)
-    
+
     indexList = list(reversed(indexList))
     valueList.append(y[point])
     indexList.append(point)
@@ -236,7 +243,7 @@ def calculatePeakAndValleyMean(x, y, point, threshold, mode):
             elif(y[point] >= rightY[i] >= y[point]-threshold):
                 valueList.append(rightY[i])
                 indexList.append(point+i)
-    
+
     meanX = int(np.mean(np.take(x, indexList)))
     meanY = np.mean(np.array(valueList))
     return (meanX, meanY)
