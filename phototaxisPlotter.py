@@ -67,9 +67,14 @@ def plotData(sample, progress, lock, data, datasheet, outputDirectory, dataNumbe
         valleys, peaks = findPeaksAndValleys(daySample, points)
         if(len(valleys) and (period == "Minimum" or period == "Both")):
             if(dayEnd != timePoints[-1]):
-                valleySample = np.take(daySample, valleys)
-                smallestValley = np.amin(valleySample)
-                valley = np.where(daySample == smallestValley)[0][0]
+                valley = None
+                smallestValley = sys.float_info.max
+                valleys.reverse()
+                for i in valleys:
+                    if(daySample[i] < smallestValley):
+                        smallestValley = daySample[i]
+                        valley = i
+
                 meanTime = None
                 meanValley = None
                 if(day == 0):
@@ -92,11 +97,13 @@ def plotData(sample, progress, lock, data, datasheet, outputDirectory, dataNumbe
                 lastValley = meanTime
         if(len(peaks) and (period == "Maximum" or period == "Both")):
             if(day != 0):
-                peakSample = np.take(daySample, peaks)
-                highestPeak = peakSample[np.where(peakSample == np.amax(peakSample))[0][0]]
-                peak = np.where(daySample == highestPeak)[0][0]
-                meanTime = None
-                meanPeak = None
+                peak = None
+                highestPeak = 0
+                for i in peaks:
+                    if(daySample[i] > highestPeak):
+                        highestPeak = daySample[i]
+                        peak = i
+
                 if(dayEnd == timePoints[-1]):
                     meanTime, meanPeak = calculatePeakAndValleyMean(dayTimePoints[points:], daySample[points:],
                                                                     peak-points, threshold, "max")
@@ -129,7 +136,7 @@ def plotData(sample, progress, lock, data, datasheet, outputDirectory, dataNumbe
 def plotComparePlots(sampleList, progress, lock, plotList, datasheet, outputDirectory, informationOfTime,
                      pointSize, label):
 
-    colorList = ("black", "b", "g", "r", "c", "m", "y")
+    colorList = ("black", "blue", "green", "red", "cyan", "magenta", "yellow")
     samples = sampleList.split(" - ")
     patches = list()
     colorIndex = 0

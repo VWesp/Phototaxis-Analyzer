@@ -33,16 +33,18 @@ if __name__ == "__main__":
     progress = None
     lock = None
 
-    app = appJar.gui("PisA", "380x380")
+    app = appJar.gui("PisA", "380x400")
 
     def buildAppJarGUI():
 
         global lbc
         global lbr
 
+        app.setTitle("PisA")
         app.setBg("silver", override=True)
         app.setFont(size=12, underline=False, slant="roman")
         app.setLocation(300, 250)
+        app.setIcon("icon/leaning-tower-of-pisa.gif")
         app.setFastStop(True)
         app.setResizable(canResize=False)
         app.winIcon = None
@@ -110,7 +112,6 @@ if __name__ == "__main__":
             app.setBg("silver", override=True)
             app.setFont(size=12, underline=False, slant="roman")
             app.startFrame("ComparingPlotsFrame", row=0, column=0)
-            app.addHorizontalSeparator()
             app.addLabel("Removable plots", "Comparing plots")
             lbc = app.addListBox("Removable plots")
             lbc.bind("<Double-1>", lambda *args: doubleClickAdd())
@@ -119,11 +120,12 @@ if __name__ == "__main__":
             app.addLabel("Removing plots", "Removing plots")
             lbr = app.addListBox("Removing plots")
             lbr.bind("<Double-1>", lambda *args: doubleClickRemove())
-            app.addHorizontalSeparator()
             app.stopFrame()
             app.startFrame("RemoveFrame", row=1, column=0)
-            app.addNamedButton("Remove", "RemoveOk", columnsPress, row=0, column=0)
-            app.addNamedButton("Cancel", "RemoveCancel", columnsPress, row=0, column=1)
+            app.addNamedButton("Remove", "RemoveOk", columnsPress)
+            app.stopFrame()
+            app.startFrame("CancelFrame", row=1, column=1)
+            app.addNamedButton("Cancel", "RemoveCancel", columnsPress)
             app.stopFrame()
 
         with app.subWindow("Analysis settings", modal=True):
@@ -179,8 +181,8 @@ if __name__ == "__main__":
 
             with app.labelFrame("Threads"):
                 app.addEmptyLabel("AdvancedFiller4")
-                app.addLabelSpinBox(" Number ", list(np.arange(1, mp.cpu_count()+1, 1)))
-                app.setSpinBox(" Number ", mp.cpu_count(), callFunction=False)
+                app.addLabelSpinBox(" Thread number ", list(np.arange(1, mp.cpu_count()+1, 1)))
+                app.setSpinBox(" Thread number ", mp.cpu_count(), callFunction=False)
                 app.addEmptyLabel("AdvancedFiller5")
 
             app.stopFrame()
@@ -246,7 +248,7 @@ if __name__ == "__main__":
 
                     app.setLabel("Input", " Input: ")
                     app.setLabel("Output", " Output: ")
-                    app.setLabel("Plots", " Comparing plots:\n  None")
+                    app.setLabel("Plots", " Comparing plots:\n  {None}")
                     app.setStatusbar("Loading input file")
                     if(datasheet != ""):
                         try:
@@ -274,7 +276,7 @@ if __name__ == "__main__":
                             dataMinutePoints = (60 * (data[key] % 1)).astype(int)
 
                     dataInt.clear()
-                    with app.subWindow("Compare columns", modal=True):
+                    with app.subWindow("Compare columns"):
                         app.setLocation(700, 300)
                         app.setResizable(canResize=False)
                         app.setBg("silver", override=True)
@@ -356,6 +358,11 @@ if __name__ == "__main__":
             app.disableMenuItem("Settings", "Plot point size")
             app.disableMenuItem("Settings", "Reset settings")
             app.disableMenuItem("Exit", "Exit PisA")
+            app.hideSubWindow("Compare columns")
+            app.hideSubWindow("Remove comparing columns")
+            app.hideSubWindow("Analysis settings")
+            app.hideSubWindow("Advanced settings")
+            app.hideSubWindow("Header settings")
 
             dataNumber = int(app.getScale(" Data number "))
             minutePoint = int(app.getScale(" Data minute point "))
@@ -430,7 +437,7 @@ if __name__ == "__main__":
                 enableMenus()
                 return
 
-            threads = int(app.getSpinBox(" Number "))
+            threads = int(app.getSpinBox(" Thread number "))
             if(os.path.exists(outputDirectory + "tmp")):
                 shutil.rmtree(outputDirectory + "tmp", ignore_errors=True)
 
@@ -701,7 +708,6 @@ if __name__ == "__main__":
         global comparePlots
 
         if(button == "CompareSet"):
-            checkBoxes = app.getAllCheckBoxes()
             checklist = list()
             for check in checkBoxes:
                 if(check != " SG-Filter On" and checkBoxes[check]):
@@ -735,7 +741,7 @@ if __name__ == "__main__":
             if(len(comparePlots)):
                 app.setLabel("Plots", " Comparing plots:\n  " + "\n  ".join(comparePlots))
             else:
-                app.setLabel("Plots", " Comparing plots:\n\n  None")
+                app.setLabel("Plots", " Comparing plots:\n  {None}")
                 app.disableMenuItem("PisA", "Remove comparing columns")
 
             app.hideSubWindow("Remove comparing columns")
@@ -792,7 +798,7 @@ if __name__ == "__main__":
         if(button == "AdvancedReset"):
             app.setEntry(" Window size ", 11)
             app.setEntry(" Poly order ", 3)
-            app.setSpinBox(" Number ", mp.cpu_count(), callFunction=False)
+            app.setSpinBox(" Thread number ", mp.cpu_count(), callFunction=False)
 
 
 
