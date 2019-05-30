@@ -4,6 +4,13 @@
 if __name__ == "__main__":
     import multiprocessing as mp
     mp.freeze_support()
+
+    print()
+    print("========================")
+    print("= Initializing PisA... =")
+    print("========================")
+    print()
+
     import phototaxisPlotter
     import os
     import shutil
@@ -79,7 +86,6 @@ if __name__ == "__main__":
         app.createMenu("Settings")
         app.addMenuItem("Settings", "Header", fileSettingsPress)
         with app.subWindow("Header settings", modal=True):
-            app.setSize("210x130")
             app.setResizable(canResize=False)
             app.setBg("silver", override=True)
             app.setFont(size=12, underline=False, slant="roman")
@@ -129,7 +135,6 @@ if __name__ == "__main__":
             app.stopFrame()
 
         with app.subWindow("Analysis settings", modal=True):
-            app.setSize("250x500")
             app.setResizable(canResize=False)
             app.setBg("silver", override=True)
             app.setFont(size=12, underline=False, slant="roman")
@@ -165,7 +170,6 @@ if __name__ == "__main__":
             app.stopFrame()
 
         with app.subWindow("Advanced settings", modal=True):
-            app.setSize("225x250")
             app.setResizable(canResize=False)
             app.setBg("silver", override=True)
             app.setFont(size=12, underline=False, slant="roman")
@@ -211,10 +215,7 @@ if __name__ == "__main__":
             app.stopScrollPane()
 
         app.stopFrame()
-
-        app.startFrame("StatusFrame")
         app.addStatusbar("Status")
-        app.stopFrame()
 
 
 
@@ -248,7 +249,7 @@ if __name__ == "__main__":
 
                     app.setLabel("Input", " Input: ")
                     app.setLabel("Output", " Output: ")
-                    app.setLabel("Plots", " Comparing plots:\n  {None}")
+                    app.setLabel("Plots", " Comparing plots:\n  None")
                     app.setStatusbar("Loading input file")
                     if(datasheet != ""):
                         try:
@@ -708,6 +709,7 @@ if __name__ == "__main__":
         global comparePlots
 
         if(button == "CompareSet"):
+            checkBoxes = app.getAllCheckBoxes()
             checklist = list()
             for check in checkBoxes:
                 if(check != " SG-Filter On" and checkBoxes[check]):
@@ -741,7 +743,7 @@ if __name__ == "__main__":
             if(len(comparePlots)):
                 app.setLabel("Plots", " Comparing plots:\n  " + "\n  ".join(comparePlots))
             else:
-                app.setLabel("Plots", " Comparing plots:\n  {None}")
+                app.setLabel("Plots", " Comparing plots:\n  None")
                 app.disableMenuItem("PisA", "Remove comparing columns")
 
             app.hideSubWindow("Remove comparing columns")
@@ -852,21 +854,18 @@ if __name__ == "__main__":
 
 
     try:
-        print()
-        print("========================")
-        print("= Initializing PisA... =")
-        print("========================")
-        print()
         manager = mp.Manager()
         progress = manager.Value("i", 0)
         lock = manager.Lock()
         app.winIcon = None
         buildAppJarGUI()
+
         print()
         print("===============")
         print("= PisA ready! =")
         print("===============")
         print()
+
         app.go()
         while(not exitApp):
             mainloop() #tkinter
