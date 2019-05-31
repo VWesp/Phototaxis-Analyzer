@@ -139,7 +139,7 @@ def plotData(sample, progress, lock, data, datasheet, outputDirectory, dataNumbe
 def plotComparePlots(sampleList, progress, lock, plotList, datasheet, outputDirectory, informationOfTime,
                      pointSize, label):
 
-    colorList = ("#000000", "#FF0000", "#FFFF00", "#008000", "#0000FF", "#A52A2A", "#FF8C00", "#00FFFF", "#FF00FF",
+    colorList = ("#000000", "#FF0000", "#FFD700", "#008000", "#0000FF", "#A52A2A", "#FF8C00", "#00FFFF", "#FF00FF",
                  "#E9967A", "#BDB76B", "#00FF00", "#6A5ACD", "#2F4F4F", "#BC8F8F")
     samples = sampleList.split(" - ")
     patches = list()

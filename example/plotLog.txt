@@ -1,5 +1,5 @@
-[Datasheet file]    	/home/valentin/git/Phototaxis-Analyzer/example/PhT64_32_2019-04-30_11-09-59.txt
-[Output directory]  	/home/valentin/git/Phototaxis-Analyzer/example/
+[Datasheet file]    	PhT64_32_2019-04-30_11-09-59.txt
+[Output directory]  	/
 [Header]            	1
 [Plot point size]   	3
 [X-axis label]      	Days
@@ -12,4 +12,9 @@
   [Polynomial order]  	3
 [Threads]           	4
 [Compared plots]    
-  1 - 2 - 3 - 8 - 9 - 10 - 11 - 12 - 15 - 17 - 18 - 22 - 23 - 24 - 29
+  1 - 2 - 3 - 4 - 5
+  6 - 7 - 8 - 9 - 10
+  11 - 12 - 13 - 14 - 15
+  16 - 17 - 18 - 19 - 20
+  21 - 22 - 23 - 24 - 25
+  26 - 27 - 28 - 29 - 30 - 31
