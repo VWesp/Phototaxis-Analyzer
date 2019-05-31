@@ -799,7 +799,7 @@ if __name__ == "__main__":
             app.showSubWindow("Advanced settings")
 
         if(button == "SGPlotColor"):
-            sgPlotColor = app.colourBox(colour="#800000")
+            sgPlotColor = app.colourBox(colour=sgPlotColor)
 
         if(button == "AnalysisReset"):
             app.setEntry(" Starting point ", 12)
