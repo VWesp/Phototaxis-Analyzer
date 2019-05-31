@@ -32,6 +32,8 @@ if __name__ == "__main__":
     dataPerMeasurement = None
     timePointIndices = None
     dataMinutePoints = None
+    plotColor = None
+    sgPlotColor = None
     comparePlots = list()
     cancelAnalysis = None
     exitApp = False
@@ -107,8 +109,10 @@ if __name__ == "__main__":
             app.addMenuRadioButton("Plot point size", "Sizes", i)
 
         app.setMenuRadioButton("Plot point size", "Sizes", 3)
+        app.addMenuItem("Settings", "Plot color", fileSettingsPress)
         app.addMenuSeparator("Settings")
         app.addMenuItem("Settings", "Reset settings", fileSettingsPress)
+        app.disableMenuItem("Settings", "Plot color")
 
         app.createMenu("Exit")
         app.addMenuItem("Exit", "Exit PisA", exitPress)
@@ -152,14 +156,15 @@ if __name__ == "__main__":
                 app.addEmptyLabel("AnalysisFiller4")
 
             with app.labelFrame("X-axis label"):
-                app.addEmptyLabel("AnalysisFiller5")
-                app.addRadioButton("Label", "Days")
-                app.addRadioButton("Label", "Hours")
+                app.addEmptyLabel("AnalysisFiller5", row=0, column=0)
+                app.addRadioButton("Label", "Days", row=1, column=0)
+                app.addRadioButton("Label", "Hours", row=1, column=1)
                 app.addEmptyLabel("AnalysisFiller6")
 
             with app.labelFrame("SG-Filter"):
-                app.addEmptyLabel("AnalysisFiller7")
-                app.addCheckBox(" SG-Filter On")
+                app.addEmptyLabel("AnalysisFiller7", row=0, column=0)
+                app.addCheckBox(" SG-Filter On", row=1, column=0)
+                app.addNamedButton("Set color", "SGPlotColor", analysisSettingsPress, row=1, column=1)
                 app.addEmptyLabel("AnalysisFiller8")
 
             app.stopFrame()
@@ -229,6 +234,8 @@ if __name__ == "__main__":
         global dataPerMeasurement
         global dataMinutePoints
         global timePointIndices
+        global plotColor
+        global sgPlotColor
 
         if(button == "Open"):
             try:
@@ -277,6 +284,8 @@ if __name__ == "__main__":
                             dataMinutePoints = (60 * (data[key] % 1)).astype(int)
 
                     dataInt.clear()
+                    plotColor = "#000000"
+                    sgPlotColor = "#800000"
                     with app.subWindow("Compare columns"):
                         app.setLocation(700, 300)
                         app.setResizable(canResize=False)
@@ -316,6 +325,7 @@ if __name__ == "__main__":
                     app.enableMenuItem("PisA", "Compare columns")
                     app.enableMenuItem("PisA", "Set period")
                     app.enableMenuItem("PisA", "PisA Settings")
+                    app.enableMenuItem("Settings", "Plot color")
                     app.setLabel("Input", " Input: " + datasheet)
                     app.setLabel("Output", " Output: " + outputDirectory)
                     app.setLabel("Plots", " Comparing plots:\n  None")
@@ -328,6 +338,7 @@ if __name__ == "__main__":
                 app.disableMenuItem("PisA", "Compare columns")
                 app.disableMenuItem("PisA", "Set period")
                 app.disableMenuItem("PisA", "PisA Settings")
+                app.disableMenuItem("Settings", "Plot color")
                 app.setStatusbar("Error file loading!")
                 app.warningBox("Unexpected error!", "An unexpected error occurred! Please check the error message" +
                            " in the second window and reload the file!")
@@ -343,7 +354,6 @@ if __name__ == "__main__":
 
     def pisaPress(button):
 
-        global comparePlots
         global cancelAnalysis
 
         if(button == "Start analysis"):
@@ -358,6 +368,7 @@ if __name__ == "__main__":
             app.disableMenuItem("Settings", "Header")
             app.disableMenuItem("Settings", "Plot point size")
             app.disableMenuItem("Settings", "Reset settings")
+            app.disableMenuItem("Settings", "Plot color")
             app.disableMenuItem("Exit", "Exit PisA")
             app.hideSubWindow("Compare columns")
             app.hideSubWindow("Remove comparing columns")
@@ -466,7 +477,8 @@ if __name__ == "__main__":
                 poolMap = partial(phototaxisPlotter.plotData, progress=progress, lock=lock, data=data,
                                   datasheet=datasheet, outputDirectory=outputDirectory, dataNumber=dataNumber,
                                   informationOfTime=informationOfTime, timePointIndices=timePointIndices,
-                                  sgFilter=sgFilter, windowSize=windowSize, polyOrder=polyOrder, period=period,
+                                  plotColor=plotColor, sgFilter=sgFilter, sgPlotColor=sgPlotColor,
+                                  windowSize=windowSize, polyOrder=polyOrder, period=period,
                                   startingPoint=startingPoint, pointSize=pointSize, label=label)
                 pages = pool.map_async(poolMap, columnNames)
                 pool.close()
@@ -778,11 +790,16 @@ if __name__ == "__main__":
 
     def analysisSettingsPress(button):
 
+        global sgPlotColor
+
         if(button == "AnalysisOk"):
             app.confirmHideSubWindow("Analysis settings")
 
         if(button == "AnalysisAdvanced"):
             app.showSubWindow("Advanced settings")
+
+        if(button == "SGPlotColor"):
+            sgPlotColor = app.colourBox(colour="#800000")
 
         if(button == "AnalysisReset"):
             app.setEntry(" Starting point ", 12)
@@ -790,6 +807,7 @@ if __name__ == "__main__":
             app.setScale(" Data minute point ", -1, callFunction=False)
             app.setRadioButton("Label", "Days", callFunction=False)
             app.setCheckBox(" SG-Filter On", ticked=False, callFunction=False)
+            sgPlotColor = "#800000"
 
 
     def advancedSettingsPress(button):
@@ -807,6 +825,7 @@ if __name__ == "__main__":
     def fileSettingsPress(button):
 
         global header
+        global plotColor
 
         if(button == "Header"):
             app.showSubWindow("Header settings")
@@ -818,10 +837,14 @@ if __name__ == "__main__":
             app.hideSubWindow("Header settings")
             app.setEntry(" Header line ", header)
 
+        if(button == "Plot color"):
+            plotColor = app.colourBox(colour=plotColor)
+
         if(button == "Reset settings"):
             header = 1
             app.setEntry(" Header line ", header)
             app.setMenuRadioButton("Plot point size", "Sizes", 3)
+            plotColor = "#000000"
 
 
 
@@ -847,6 +870,7 @@ if __name__ == "__main__":
         app.enableMenuItem("Settings", "Header")
         app.enableMenuItem("Settings", "Plot point size")
         app.enableMenuItem("Settings", "Reset settings")
+        app.enableMenuItem("Settings", "Plot color")
         app.enableMenuItem("Exit", "Exit PisA")
         if(len(comparePlots)):
             app.enableMenuItem("PisA", "Remove comparing columns")

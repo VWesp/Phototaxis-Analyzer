@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 
 def plotData(sample, progress, lock, data, datasheet, outputDirectory, dataNumber, informationOfTime,
-             timePointIndices, sgFilter, windowSize, polyOrder, period, startingPoint, pointSize, label):
+             timePointIndices, plotColor, sgFilter, sgPlotColor, windowSize, polyOrder, period, startingPoint, pointSize, label):
 
     timePoints = informationOfTime[0]
     timePointLabels = informationOfTime[1]
@@ -31,9 +31,10 @@ def plotData(sample, progress, lock, data, datasheet, outputDirectory, dataNumbe
     dataPoints_smoothed = signal.savgol_filter(sampleData_invertMean, windowSize, polyOrder)
 
     figure = plt.figure()
-    plt.plot(timePoints, dataPoints, marker="o", markersize=pointSize, color="black", linestyle="-", label="raw data")
+    plt.plot(timePoints, dataPoints, marker="o", markersize=pointSize, color=plotColor, linestyle="-",
+             label="raw data")
     if(sgFilter):
-        plt.plot(timePoints, dataPoints_smoothed, color="maroon", linestyle="-", label="smoothed data")
+        plt.plot(timePoints, dataPoints_smoothed, color=sgPlotColor, linestyle="-", label="smoothed data")
         plt.legend(bbox_to_anchor=(1.05,0.5))
 
     plt.title(sample + "\n" + datasheet.split("/")[-1])
@@ -81,8 +82,9 @@ def plotData(sample, progress, lock, data, datasheet, outputDirectory, dataNumbe
                     meanTime, meanValley = calculatePeakAndValleyMean(dayTimePoints[:-points], daySample[:-points],
                                                                       valley, threshold, "min")
                 else:
-                    meanTime, meanValley = calculatePeakAndValleyMean(dayTimePoints[points:-points], daySample[points:-points],
-                                                                      valley-points, threshold, "min")
+                    meanTime, meanValley = calculatePeakAndValleyMean(dayTimePoints[points:-points],
+                                                                      daySample[points:-points], valley-points,
+                                                                      threshold, "min")
                 if(lastValley != None):
                     bottomLine = minVoltage - (maxVoltage - minVoltage) * 0.1
                     plt.plot([meanTime, lastValley], [bottomLine, bottomLine], color="black", linestyle="-")
@@ -108,8 +110,9 @@ def plotData(sample, progress, lock, data, datasheet, outputDirectory, dataNumbe
                     meanTime, meanPeak = calculatePeakAndValleyMean(dayTimePoints[points:], daySample[points:],
                                                                     peak-points, threshold, "max")
                 else:
-                    meanTime, meanPeak = calculatePeakAndValleyMean(dayTimePoints[points:-points], daySample[points:-points],
-                                                                    peak-points, threshold, "max")
+                    meanTime, meanPeak = calculatePeakAndValleyMean(dayTimePoints[points:-points],
+                                                                    daySample[points:-points], peak-points,
+                                                                    threshold, "max")
                 if(lastPeak != None):
                     topLine = maxVoltage + (maxVoltage - minVoltage) * 0.1
                     plt.plot([meanTime, lastPeak], [topLine, topLine], color="black", linestyle="-")
@@ -136,7 +139,8 @@ def plotData(sample, progress, lock, data, datasheet, outputDirectory, dataNumbe
 def plotComparePlots(sampleList, progress, lock, plotList, datasheet, outputDirectory, informationOfTime,
                      pointSize, label):
 
-    colorList = ("black", "blue", "green", "red", "cyan", "magenta", "yellow")
+    colorList = ("#000000", "#FF0000", "#FFFF00", "#008000", "#0000FF", "#A52A2A", "#FF8C00", "#00FFFF", "#FF00FF",
+                 "#E9967A", "#BDB76B", "#00FF00", "#6A5ACD", "#2F4F4F", "#BC8F8F")
     samples = sampleList.split(" - ")
     patches = list()
     colorIndex = 0
