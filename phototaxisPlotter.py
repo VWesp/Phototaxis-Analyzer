@@ -192,7 +192,7 @@ def findPeaksAndValleys(y, points):
         for i in range(points, len(y)-points, 1):
             valleyFound = True
             for j in range(1, points+1, 1):
-                if(y[i] > y[i-j] or y[i] > y[i+j]):
+                if(y[i] > y[i-j] or y[i-j] < y[i-j-1] or y[i] > y[i+j] or y[i+j] < y[i+j-1]):
                     valleyFound = False
                     break
 
@@ -201,7 +201,7 @@ def findPeaksAndValleys(y, points):
 
             peakFound = True
             for j in range(1, points+1, 1):
-                if(y[i] < y[i-j] or y[i] < y[i+j]):
+                if(y[i] < y[i-j] or y[i-j] > y[i-j-1] or y[i] < y[i+j] or y[i+j] > y[i+j-1]):
                     peakFound = False
                     break
 
@@ -216,16 +216,16 @@ def calculatePeakAndValleyMean(x, y, point, threshold, mode):
 
     valueList = list()
     indexList = list()
-    leftY = y[:point]
-    for i in range(len(leftY)-1, -1, -1):
+    leftY = y[:point+1]
+    for i in range(len(leftY)-2, -1, -1):
         if(mode == "min"):
-            if(leftY[i] > y[point]+threshold):
+            if(leftY[i] > y[point]+threshold or leftY[i] < leftY[i+1]):
                 break
             elif(y[point] <= leftY[i] <= y[point]+threshold):
                 valueList.append(leftY[i])
                 indexList.append(i)
         elif(mode == "max"):
-            if(leftY[i] < y[point]-threshold):
+            if(leftY[i] < y[point]-threshold or leftY[i] > leftY[i+1]):
                 break
             elif(y[point] >= leftY[i] >= y[point]-threshold):
                 valueList.append(leftY[i])
@@ -237,13 +237,13 @@ def calculatePeakAndValleyMean(x, y, point, threshold, mode):
     rightY = y[point:]
     for i in range(1, len(rightY), 1):
         if(mode == "min"):
-            if(rightY[i] > y[point]+threshold):
+            if(rightY[i] > y[point]+threshold or leftY[i] < leftY[i-1]):
                 break
             elif(y[point] <= rightY[i] <= y[point]+threshold):
                 valueList.append(rightY[i])
                 indexList.append(point+i)
         elif(mode == "max"):
-            if(rightY[i] < y[point]-threshold):
+            if(rightY[i] < y[point]-threshold or leftY[i] > leftY[i-1])):
                 break
             elif(y[point] >= rightY[i] >= y[point]-threshold):
                 valueList.append(rightY[i])
