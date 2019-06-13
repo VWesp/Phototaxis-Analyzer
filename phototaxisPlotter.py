@@ -7,8 +7,9 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 
 def plotData(sample, progress, lock, data, datasheet, outputDirectory, dataNumber, informationOfTime,
-             timePointIndices, plotColor, sgFilter, sgPlotColor, windowSize, polyOrder, period, startingPoint, pointSize, label):
-
+             timePointIndices, plotColor, minFirstDay, minLastDay, maxFirstDay, maxLastDay, points, amplitudePercentage,
+             sgFilter, sgPlotColor, windowSize, polyOrder, period, startingPoint, pointSize, label):
+    
     timePoints = informationOfTime[0]
     timePointLabels = informationOfTime[1]
     days = informationOfTime[2]
@@ -28,23 +29,25 @@ def plotData(sample, progress, lock, data, datasheet, outputDirectory, dataNumbe
         sampleData_invertMean = np.mean(sampleData_invert[:,-dataNumber:], axis=1)
 
     dataPoints = sampleData_invertMean
-    dataPoints_smoothed = signal.savgol_filter(sampleData_invertMean, windowSize, polyOrder)
-
     figure = plt.figure()
     plt.plot(timePoints, dataPoints, marker="o", markersize=pointSize, color=plotColor, linestyle="-",
              label="raw data")
     if(sgFilter):
+        dataPoints_smoothed = signal.savgol_filter(sampleData_invertMean, windowSize, polyOrder)
         plt.plot(timePoints, dataPoints_smoothed, color=sgPlotColor, linestyle="-", label="smoothed data")
-        plt.legend(bbox_to_anchor=(1.05,0.5))
+        plt.legend(bbox_to_anchor=(1.05,0.40))
 
     plt.title(sample + "\n" + datasheet.split("/")[-1])
     plt.xticks(days, timePointLabels)
     plt.xlabel(label)
     plt.ylabel("mV")
-    threshold = (maxVoltage - minVoltage) * 0.05
+    threshold = (maxVoltage - minVoltage) * (amplitudePercentage / 100)
     lastValley = None
     lastPeak = None
-    points = 1
+    meanMinimumPeriod = 0
+    minimumPeriods = 0
+    meanMaximunPeriod = 0
+    maximumPeriods = 0
     for day in days:
         dayStart = day - (2 * points)
         dayEnd = day + (22 + (2 * points))
@@ -67,7 +70,7 @@ def plotData(sample, progress, lock, data, datasheet, outputDirectory, dataNumbe
         dayTimePoints = timePoints[timeIndexStart:timeIndexEnd+1]
         valleys, peaks = findPeaksAndValleys(daySample, points)
         if(len(valleys) and (period == "Minimum" or period == "Both")):
-            if(dayEnd != timePoints[-1]):
+            if(not ((minFirstDay and day == 0) or (minLastDay and dayEnd == timePoints[-1]))):
                 valley = None
                 smallestValley = sys.float_info.max
                 valleys.reverse()
@@ -91,6 +94,8 @@ def plotData(sample, progress, lock, data, datasheet, outputDirectory, dataNumbe
                     plt.annotate(str(meanTime-lastValley).replace(".", ",") + "h", xy=((meanTime+lastValley)/2, 0.04),
                                  xycoords=("data","axes fraction"), size=10, ha="center")
                     minimumPeriodList.append(str(meanTime-lastValley).replace(".", ","))
+                    meanMinimumPeriod += meanTime - lastValley
+                    minimumPeriods += 1
 
                 top = minVoltage - (maxVoltage - minVoltage) * 0.15
                 bottom = minVoltage - (maxVoltage - minVoltage) * 0.05
@@ -98,7 +103,7 @@ def plotData(sample, progress, lock, data, datasheet, outputDirectory, dataNumbe
                 minimumPhaseList.append(str(meanTime%24).replace(".", ",") + ";" + str(meanValley).replace(".", ","))
                 lastValley = meanTime
         if(len(peaks) and (period == "Maximum" or period == "Both")):
-            if(day != 0):
+            if(not ((maxFirstDay and day == 0) or (maxLastDay and dayEnd == timePoints[-1]))):
                 peak = None
                 highestPeak = 0
                 for i in peaks:
@@ -119,13 +124,24 @@ def plotData(sample, progress, lock, data, datasheet, outputDirectory, dataNumbe
                     plt.annotate(str(meanTime-lastPeak).replace(".", ",") + "h", xy=((meanTime+lastPeak)/2, 0.93),
                                  xycoords=("data","axes fraction"), size=10, ha="center")
                     maximumPeriodList.append(str(meanTime-lastPeak).replace(".", ","))
+                    meanMaximunPeriod += meanTime - lastPeak
+                    maximumPeriods += 1
 
                 top = maxVoltage + (maxVoltage - minVoltage) * 0.15
                 bottom = maxVoltage + (maxVoltage - minVoltage) * 0.05
                 plt.plot([meanTime, meanTime], [top, bottom], color="black", linestyle="-")
                 maximumPhaseList.append(str(meanTime%24).replace(".", ",") + ";" + str(meanPeak).replace(".", ","))
                 lastPeak = meanTime
-
+    
+    props = dict(boxstyle='round', facecolor='white', alpha=0.15)
+    if(period == "Minimum"):
+        plt.gcf().text(0.955, 0.5, "mean min period: " + "{0:.2f}".format(meanMinimumPeriod / minimumPeriods) + "h", bbox=props)
+    elif(period == "Maximum"):
+        plt.gcf().text(0.955, 0.5, "mean max period: " + "{0:.2f}".format(meanMaximunPeriod / maximumPeriods) + "h", bbox=props)
+    else:
+        plt.gcf().text(0.955, 0.5, "mean max period: " + "{0:.2f}".format(meanMaximunPeriod / maximumPeriods) + "h\n\n" +
+                       "mean min period: " + "{0:.2f}".format(meanMinimumPeriod / minimumPeriods) + "h", bbox=props)
+        
     figure.savefig(outputDirectory + "tmp/" + sample + ".pdf", bbox_inches="tight")
     plt.close()
     with lock:
@@ -192,7 +208,7 @@ def findPeaksAndValleys(y, points):
         for i in range(points, len(y)-points, 1):
             valleyFound = True
             for j in range(1, points+1, 1):
-                if(y[i] > y[i-j] or y[i-j] < y[i-j-1] or y[i] > y[i+j] or y[i+j] < y[i+j-1]):
+                if(y[i] > y[i-j] or y[i] > y[i+j]):
                     valleyFound = False
                     break
 
@@ -201,7 +217,7 @@ def findPeaksAndValleys(y, points):
 
             peakFound = True
             for j in range(1, points+1, 1):
-                if(y[i] < y[i-j] or y[i-j] > y[i-j-1] or y[i] < y[i+j] or y[i+j] > y[i+j-1]):
+                if(y[i] < y[i-j] or y[i] < y[i+j]):
                     peakFound = False
                     break
 
@@ -219,13 +235,13 @@ def calculatePeakAndValleyMean(x, y, point, threshold, mode):
     leftY = y[:point+1]
     for i in range(len(leftY)-2, -1, -1):
         if(mode == "min"):
-            if(leftY[i] > y[point]+threshold or leftY[i] < leftY[i+1]):
+            if(leftY[i] > y[point]+threshold):
                 break
             elif(y[point] <= leftY[i] <= y[point]+threshold):
                 valueList.append(leftY[i])
                 indexList.append(i)
         elif(mode == "max"):
-            if(leftY[i] < y[point]-threshold or leftY[i] > leftY[i+1]):
+            if(leftY[i] < y[point]-threshold):
                 break
             elif(y[point] >= leftY[i] >= y[point]-threshold):
                 valueList.append(leftY[i])
@@ -237,13 +253,13 @@ def calculatePeakAndValleyMean(x, y, point, threshold, mode):
     rightY = y[point:]
     for i in range(1, len(rightY), 1):
         if(mode == "min"):
-            if(rightY[i] > y[point]+threshold or leftY[i] < leftY[i-1]):
+            if(rightY[i] > y[point]+threshold):
                 break
             elif(y[point] <= rightY[i] <= y[point]+threshold):
                 valueList.append(rightY[i])
                 indexList.append(point+i)
         elif(mode == "max"):
-            if(rightY[i] < y[point]-threshold or leftY[i] > leftY[i-1])):
+            if(rightY[i] < y[point]-threshold):
                 break
             elif(y[point] >= rightY[i] >= y[point]-threshold):
                 valueList.append(rightY[i])

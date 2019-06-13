@@ -5,24 +5,46 @@ if __name__ == "__main__":
     import multiprocessing as mp
     mp.freeze_support()
 
-    print()
     print("========================")
     print("= Initializing PisA... =")
     print("========================")
-    print()
-
+    
+    print("> loading phototaxisPlotter module", end="\r")
     import phototaxisPlotter
+    print("> phototaxisPlotter module loaded.")
+    print("> loading os module", end="\r")
     import os
+    print("> os module loaded.")
+    print("> loading shutil module", end="\r")
     import shutil
+    print("> shutil module loaded.")
+    print("> loading subprocess module", end="\r")
     import subprocess
+    print("> subprocess module loaded.")
+    print("> loading pandas module", end="\r")
     import pandas as pd
+    print("> pandas module loaded.")
+    print("> loading numpy module", end="\r")
     import numpy as np
+    print("> numpy module loaded.")
+    print("> loading traceback module", end="\r")
     import traceback
+    print("> traceback module loaded.")
+    print("> loading itertools module", end="\r")
     import itertools
+    print("> itertools module loaded.")
+    print("> loading functools module", end="\r")
     from functools import partial
+    print("> functools module loaded.")
+    print("> loading PyPDF2 module", end="\r")
     from PyPDF2 import PdfFileMerger, PdfFileReader
+    print("> PyPDF2 module loaded.")
+    print("> loading appJar module", end="\r")
     import appJar
+    print("> appJar module loaded.")
+    print("> loading tkinter module", end="\r")
     from tkinter import *
+    print("> tkinter module loaded.")
 
     data = None
     header = 1
@@ -154,18 +176,31 @@ if __name__ == "__main__":
                 app.addLabelScale(" Data minute point ")
                 app.showScaleValue(" Data minute point ", show=True)
                 app.addEmptyLabel("AnalysisFiller4")
+                with app.labelFrame("Minimum"):
+                    app.addEmptyLabel("AnalysisFiller5")
+                    app.addCheckBox(" Exclude first Day [min]", row=0, column=0)
+                    app.addCheckBox(" Exclude last Day [min]", row=0, column=1)
+                    app.setCheckBox(" Exclude last Day [min]", ticked=True, callFunction=False)
+                    app.addEmptyLabel("AnalysisFiller6")
+                    
+                with app.labelFrame("Maximum"):
+                    app.addEmptyLabel("AnalysisFiller7")
+                    app.addCheckBox(" Exclude first Day [max]", row=0, column=0)
+                    app.addCheckBox(" Exclude last Day [max]", row=0, column=1)
+                    app.setCheckBox(" Exclude first Day [max]", ticked=True, callFunction=False)
+                    app.addEmptyLabel("AnalysisFiller8")
 
             with app.labelFrame("X-axis label"):
-                app.addEmptyLabel("AnalysisFiller5", row=0, column=0)
+                app.addEmptyLabel("AnalysisFiller9", row=0, column=0)
                 app.addRadioButton("Label", "Days", row=1, column=0)
                 app.addRadioButton("Label", "Hours", row=1, column=1)
-                app.addEmptyLabel("AnalysisFiller6")
+                app.addEmptyLabel("AnalysisFiller10")
 
             with app.labelFrame("SG-Filter"):
-                app.addEmptyLabel("AnalysisFiller7", row=0, column=0)
+                app.addEmptyLabel("AnalysisFiller11", row=0, column=0)
                 app.addCheckBox(" SG-Filter On", row=1, column=0)
                 app.addNamedButton("Set color", "SGPlotColor", analysisSettingsPress, row=1, column=1)
-                app.addEmptyLabel("AnalysisFiller8")
+                app.addEmptyLabel("AnalysisFiller12")
 
             app.stopFrame()
             app.startFrame("AnalysisButtonsFrame", row=3, column=0)
@@ -179,20 +214,32 @@ if __name__ == "__main__":
             app.setBg("silver", override=True)
             app.setFont(size=12, underline=False, slant="roman")
             app.startFrame("AdvancedOptionsFrame", row=0, column=0)
-            with app.labelFrame("Savitzky-Golay-Filter"):
+            with app.labelFrame("Peak-Valley-Detection"):
                 app.addEmptyLabel("AdvancedFiller1")
+                app.addLabelSpinBox(" Points ", list(np.arange(1, 1000, 1)))
+                app.setSpinBox(" Points ", 1)
+                app.addEmptyLabel("AdvancedFiller2")
+                
+            with app.labelFrame("Peak-Valley-Mean-Calculation"):
+                app.addEmptyLabel("AdvancedFiller3")
+                app.addLabelEntry(" Amplitude percentage %")
+                app.setEntry(" Amplitude percentage %", 3)
+                app.addEmptyLabel("AdvancedFiller4")
+                
+            with app.labelFrame("Savitzky-Golay-Filter"):
+                app.addEmptyLabel("AdvancedFiller5")
                 app.addLabelEntry(" Window size ")
                 app.setEntry(" Window size ", 11)
-                app.addEmptyLabel("AdvancedFiller2")
+                app.addEmptyLabel("AdvancedFiller6")
                 app.addLabelEntry(" Poly order ")
                 app.setEntry(" Poly order ", 3)
-                app.addEmptyLabel("AdvancedFiller3")
+                app.addEmptyLabel("AdvancedFiller7")
 
             with app.labelFrame("Threads"):
-                app.addEmptyLabel("AdvancedFiller4")
+                app.addEmptyLabel("AdvancedFiller8")
                 app.addLabelSpinBox(" Thread number ", list(np.arange(1, mp.cpu_count()+1, 1)))
                 app.setSpinBox(" Thread number ", mp.cpu_count(), callFunction=False)
-                app.addEmptyLabel("AdvancedFiller5")
+                app.addEmptyLabel("AdvancedFiller9")
 
             app.stopFrame()
             app.startFrame("AdvancecButtonsFrame", row=1, column=0)
@@ -391,7 +438,25 @@ if __name__ == "__main__":
                     return
 
             pointSize = int(app.getMenuRadioButton("Plot point size", "Sizes"))
+            minFirstDay = app.getCheckBox(" Exclude first Day [min]")
+            minLastDay = app.getCheckBox(" Exclude last Day [min]")
+            maxFirstDay = app.getCheckBox(" Exclude first Day [max]")
+            maxLastDay = app.getCheckBox(" Exclude last Day [max]")
             label = app.getRadioButton("Label")
+            points = int(app.getSpinBox(" Points "))
+            amplitudePercentage = app.getEntry(" Amplitude percentage %")
+            if(not len(amplitudePercentage)):
+                amplitudePercentage = 3
+            else:
+                try:
+                    amplitudePercentage = float(amplitudePercentage)
+                    if(amplitudePercentage < 0):
+                        raise ValueError()
+                except ValueError:
+                    app.warningBox("Value warning", "The amplitude percentage has to be a positive integer number!")
+                    enableMenus()
+                    return
+            
             sgFilter = app.getCheckBox(" SG-Filter On")
             windowSize = app.getEntry(" Window size ")
             if(not len(windowSize)):
@@ -477,9 +542,10 @@ if __name__ == "__main__":
                 poolMap = partial(phototaxisPlotter.plotData, progress=progress, lock=lock, data=data,
                                   datasheet=datasheet, outputDirectory=outputDirectory, dataNumber=dataNumber,
                                   informationOfTime=informationOfTime, timePointIndices=timePointIndices,
-                                  plotColor=plotColor, sgFilter=sgFilter, sgPlotColor=sgPlotColor,
-                                  windowSize=windowSize, polyOrder=polyOrder, period=period,
-                                  startingPoint=startingPoint, pointSize=pointSize, label=label)
+                                  plotColor=plotColor, minFirstDay=minFirstDay, minLastDay=minLastDay, maxFirstDay=maxFirstDay,
+                                  maxLastDay=maxLastDay, points=points, amplitudePercentage=amplitudePercentage,
+                                  sgFilter=sgFilter, sgPlotColor=sgPlotColor, windowSize=windowSize, polyOrder=polyOrder,
+                                  period=period, startingPoint=startingPoint, pointSize=pointSize, label=label)
                 pages = pool.map_async(poolMap, columnNames)
                 pool.close()
                 while(progress.value != len(columnNames)):
@@ -642,7 +708,7 @@ if __name__ == "__main__":
                         if(minutePoint == -1):
                             minutePoint = "None"
 
-                        space = len("  [Polynomial order]")
+                        space = len("[Amplitude percentage %]")
                         logList = list()
                         logList.append("[Datasheet file]" + " "*(space-len("[Datasheet file]")) + "\t" + datasheet)
                         logList.append("[Output directory]" + " "*(space-len("[Output directory]")) + "\t" +
@@ -658,6 +724,20 @@ if __name__ == "__main__":
                                        str(dataNumber))
                         logList.append("[Minute point]" + " "*(space-len("[Minute point]")) +
                                        "\t" + str(minutePoint))
+                        logList.append("[Minimum]")
+                        logList.append("  [Exclude first day]" + " "*(space-len("  [Exclude first day]")) + "\t" +
+                                       str(minFirstDay))
+                        logList.append("  [Exclude last day]" + " "*(space-len("  [Exclude last day]")) + "\t" +
+                                       str(minLastDay))
+                        logList.append("[Maximum]")
+                        logList.append("  [Exclude first day]" + " "*(space-len("  [Exclude first day]")) + "\t" +
+                                       str(maxFirstDay))
+                        logList.append("  [Exclude last day]" + " "*(space-len("  [Exclude last day]")) + "\t" +
+                                       str(maxLastDay))
+                        logList.append("[Peak-Valley-Points]" + " "*(space-len("[Peak-Valley-Points]")) + "\t" +
+                                       str(points))
+                        logList.append("[Amplitude percentage %]" + " "*(space-len("[Amplitude percentage %]")) + "\t" + 
+                                       str(amplitudePercentage))
                         logList.append("[SG-Filter On]" + " "*(space-len("[SG-Filter]")) + "\t" + str(sgFilter))
                         logList.append("  [Window size]" + " "*(space-len("[Window size]")) + "\t" + str(windowSize))
                         logList.append("  [Polynomial order]" + " "*(space-len("[Polynomial order]")) + "\t" +
@@ -723,8 +803,8 @@ if __name__ == "__main__":
         if(button == "CompareSet"):
             checkBoxes = app.getAllCheckBoxes()
             checklist = list()
-            for check in checkBoxes:
-                if(check != " SG-Filter On" and checkBoxes[check]):
+            for check in columnNames:
+                if(checkBoxes[check]):
                     checklist.append(check)
                     app.setCheckBox(check, ticked=False, callFunction=False)
 
@@ -740,8 +820,8 @@ if __name__ == "__main__":
 
         if(button == "CompareClose"):
             checkBoxes = app.getAllCheckBoxes()
-            for check in checkBoxes:
-                if(check != " SG-Filter On" and checkBoxes[check]):
+            for check in columnNames:
+                if(checkBoxes[check]):
                     app.setCheckBox(check, ticked=False, callFunction=False)
 
             app.hideSubWindow("Compare columns")
@@ -805,6 +885,10 @@ if __name__ == "__main__":
             app.setEntry(" Starting point ", 12)
             app.setScale(" Data number ", 5, callFunction=False)
             app.setScale(" Data minute point ", -1, callFunction=False)
+            app.setCheckBox(" Exclude first Day [min]", ticked=False, callFunction=False)
+            app.setCheckBox(" Exclude last Day [min]", ticked=True, callFunction=False)
+            app.setCheckBox(" Exclude first Day [max]", ticked=True, callFunction=False)
+            app.setCheckBox(" Exclude last Day [max]", ticked=False, callFunction=False)
             app.setRadioButton("Label", "Days", callFunction=False)
             app.setCheckBox(" SG-Filter On", ticked=False, callFunction=False)
             sgPlotColor = "#800000"
@@ -816,6 +900,8 @@ if __name__ == "__main__":
             app.hideSubWindow("Advanced settings")
 
         if(button == "AdvancedReset"):
+            app.setSpinBox(" Points ", 1)
+            app.setEntry(" Amplitude percentage %", 3)
             app.setEntry(" Window size ", 11)
             app.setEntry(" Poly order ", 3)
             app.setSpinBox(" Thread number ", mp.cpu_count(), callFunction=False)
@@ -884,11 +970,9 @@ if __name__ == "__main__":
         app.winIcon = None
         buildAppJarGUI()
 
-        print()
         print("===============")
         print("= PisA ready! =")
         print("===============")
-        print()
 
         app.go()
         while(not exitApp):
