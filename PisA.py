@@ -8,43 +8,45 @@ if __name__ == "__main__":
     print("========================")
     print("= Initializing PisA... =")
     print("========================")
-    
-    print("> loading phototaxisPlotter module", end="\r")
+
+    print("> Loading modules...")
+    print("  -> loading phototaxisPlotter module...", end="\r")
     import phototaxisPlotter
-    print("> phototaxisPlotter module loaded.")
-    print("> loading os module", end="\r")
+    print("\033[K  -> phototaxisPlotter module loaded.")
+    print("  -> loading os module...", end="\r")
     import os
-    print("> os module loaded.")
-    print("> loading shutil module", end="\r")
+    print("\033[K  -> os module loaded.")
+    print("  -> loading shutil module...", end="\r")
     import shutil
-    print("> shutil module loaded.")
-    print("> loading subprocess module", end="\r")
+    print("\033[K  -> shutil module loaded.")
+    print("  -> loading subprocess module...", end="\r")
     import subprocess
-    print("> subprocess module loaded.")
-    print("> loading pandas module", end="\r")
+    print("\033[K  -> subprocess module loaded.")
+    print("  -> loading pandas module...", end="\r")
     import pandas as pd
-    print("> pandas module loaded.")
-    print("> loading numpy module", end="\r")
+    print("\033[K  -> pandas module loaded.")
+    print("  -> loading numpy module...", end="\r")
     import numpy as np
-    print("> numpy module loaded.")
-    print("> loading traceback module", end="\r")
+    print("\033[K  -> numpy module loaded.")
+    print("  -> loading traceback module...", end="\r")
     import traceback
-    print("> traceback module loaded.")
-    print("> loading itertools module", end="\r")
+    print("\033[K  -> traceback module loaded.")
+    print("  -> loading itertools module...", end="\r")
     import itertools
-    print("> itertools module loaded.")
-    print("> loading functools module", end="\r")
+    print("\033[K  -> itertools module loaded.")
+    print("  -> loading functools module...", end="\r")
     from functools import partial
-    print("> functools module loaded.")
-    print("> loading PyPDF2 module", end="\r")
+    print("\033[K  -> functools module loaded.")
+    print("  -> loading PyPDF2 module...", end="\r")
     from PyPDF2 import PdfFileMerger, PdfFileReader
-    print("> PyPDF2 module loaded.")
-    print("> loading appJar module", end="\r")
+    print("\033[K  -> PyPDF2 module loaded.")
+    print("  -> loading appJar module...", end="\r")
     import appJar
-    print("> appJar module loaded.")
-    print("> loading tkinter module", end="\r")
+    print("\033[K  -> appJar module loaded.")
+    print("  -> loading tkinter module...", end="\r")
     from tkinter import *
-    print("> tkinter module loaded.")
+    print("\033[K  -> tkinter module loaded.")
+    print("> Modules loaded.")
 
     data = None
     header = 1
@@ -182,7 +184,7 @@ if __name__ == "__main__":
                     app.addCheckBox(" Exclude last Day [min]", row=0, column=1)
                     app.setCheckBox(" Exclude last Day [min]", ticked=True, callFunction=False)
                     app.addEmptyLabel("AnalysisFiller6")
-                    
+
                 with app.labelFrame("Maximum"):
                     app.addEmptyLabel("AnalysisFiller7")
                     app.addCheckBox(" Exclude first Day [max]", row=0, column=0)
@@ -219,13 +221,13 @@ if __name__ == "__main__":
                 app.addLabelSpinBox(" Points ", list(np.arange(1, 1000, 1)))
                 app.setSpinBox(" Points ", 1)
                 app.addEmptyLabel("AdvancedFiller2")
-                
+
             with app.labelFrame("Peak-Valley-Mean-Calculation"):
                 app.addEmptyLabel("AdvancedFiller3")
                 app.addLabelEntry(" Amplitude percentage %")
                 app.setEntry(" Amplitude percentage %", 3)
                 app.addEmptyLabel("AdvancedFiller4")
-                
+
             with app.labelFrame("Savitzky-Golay-Filter"):
                 app.addEmptyLabel("AdvancedFiller5")
                 app.addLabelEntry(" Window size ")
@@ -456,7 +458,7 @@ if __name__ == "__main__":
                     app.warningBox("Value warning", "The amplitude percentage has to be a positive integer number!")
                     enableMenus()
                     return
-            
+
             sgFilter = app.getCheckBox(" SG-Filter On")
             windowSize = app.getEntry(" Window size ")
             if(not len(windowSize)):
@@ -736,7 +738,7 @@ if __name__ == "__main__":
                                        str(maxLastDay))
                         logList.append("[Peak-Valley-Points]" + " "*(space-len("[Peak-Valley-Points]")) + "\t" +
                                        str(points))
-                        logList.append("[Amplitude percentage %]" + " "*(space-len("[Amplitude percentage %]")) + "\t" + 
+                        logList.append("[Amplitude percentage %]" + " "*(space-len("[Amplitude percentage %]")) + "\t" +
                                        str(amplitudePercentage))
                         logList.append("[SG-Filter On]" + " "*(space-len("[SG-Filter]")) + "\t" + str(sgFilter))
                         logList.append("  [Window size]" + " "*(space-len("[Window size]")) + "\t" + str(windowSize))
@@ -968,7 +970,10 @@ if __name__ == "__main__":
         progress = manager.Value("i", 0)
         lock = manager.Lock()
         app.winIcon = None
+
+        print("> Building GUI...", end="\r")
         buildAppJarGUI()
+        print("\033[K> GUI built.")
 
         print("===============")
         print("= PisA ready! =")
@@ -977,6 +982,10 @@ if __name__ == "__main__":
         app.go()
         while(not exitApp):
             mainloop() #tkinter
+
+        print("===============")
+        print("= PisA closed! =")
+        print("===============")
     except Exception:
         app.errorBox("Critical error!", traceback.format_exc())
         with open(outputDirectory + "errorLog.txt", "w") as logWriter:
