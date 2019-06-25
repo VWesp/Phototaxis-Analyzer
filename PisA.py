@@ -66,6 +66,9 @@ if __name__ == "__main__":
     progress = None
     lock = None
 
+    pages = None
+    compareResults = None
+
     app = appJar.gui("PisA", "380x400")
 
     def buildAppJarGUI():
@@ -99,7 +102,7 @@ if __name__ == "__main__":
         app.addMenuRadioButton("Set period", "Period", "Minimum")
         app.addMenuRadioButton("Set period", "Period", "Maximum")
         app.addMenuRadioButton("Set period", "Period", "Both")
-        app.setMenuRadioButton("Set period", "Period", "Minimum")
+        app.setMenuRadioButton("Set period", "Period", "Both")
         app.addMenuSeparator("PisA")
         app.addMenuItem("PisA", "PisA Settings", pisaPress)
         app.disableMenuItem("PisA", "Start analysis")
@@ -136,6 +139,7 @@ if __name__ == "__main__":
         app.addMenuItem("Settings", "Plot color", fileSettingsPress)
         app.addMenuSeparator("Settings")
         app.addMenuItem("Settings", "Reset settings", fileSettingsPress)
+        app.disableMenuItem("Settings", "Plot point size")
         app.disableMenuItem("Settings", "Plot color")
 
         app.createMenu("Exit")
@@ -240,7 +244,10 @@ if __name__ == "__main__":
             with app.labelFrame("Threads"):
                 app.addEmptyLabel("AdvancedFiller8")
                 app.addLabelSpinBox(" Thread number ", list(np.arange(1, mp.cpu_count()+1, 1)))
-                app.setSpinBox(" Thread number ", mp.cpu_count(), callFunction=False)
+                if(os.name == "nt"):
+                    app.setSpinBox(" Thread number ", 1, callFunction=False)
+                else:
+                    app.setSpinBox(" Thread number ", mp.cpu_count(), callFunction=False)
                 app.addEmptyLabel("AdvancedFiller9")
 
             app.stopFrame()
@@ -374,6 +381,7 @@ if __name__ == "__main__":
                     app.enableMenuItem("PisA", "Compare columns")
                     app.enableMenuItem("PisA", "Set period")
                     app.enableMenuItem("PisA", "PisA Settings")
+                    app.enableMenuItem("Settings", "Plot point size")
                     app.enableMenuItem("Settings", "Plot color")
                     app.setLabel("Input", " Input: " + datasheet)
                     app.setLabel("Output", " Output: " + outputDirectory)
@@ -387,6 +395,7 @@ if __name__ == "__main__":
                 app.disableMenuItem("PisA", "Compare columns")
                 app.disableMenuItem("PisA", "Set period")
                 app.disableMenuItem("PisA", "PisA Settings")
+                app.disableMenuItem("Settings", "Plot point size")
                 app.disableMenuItem("Settings", "Plot color")
                 app.setStatusbar("Error file loading!")
                 app.warningBox("Unexpected error!", "An unexpected error occurred! Please check the error message" +
@@ -403,6 +412,8 @@ if __name__ == "__main__":
 
     def pisaPress(button):
 
+        global pages
+        global compareResults
         global cancelAnalysis
 
         if(button == "Start analysis"):
@@ -417,6 +428,7 @@ if __name__ == "__main__":
             app.disableMenuItem("Settings", "Header")
             app.disableMenuItem("Settings", "Plot point size")
             app.disableMenuItem("Settings", "Reset settings")
+            app.disableMenuItem("Settings", "Plot point size")
             app.disableMenuItem("Settings", "Plot color")
             app.disableMenuItem("Exit", "Exit PisA")
             app.hideSubWindow("Compare columns")
@@ -540,19 +552,33 @@ if __name__ == "__main__":
                     minuteIndices = np.arange(minuteIndex, len(data["h"]), dataPerMeasurement)
 
                 informationOfTime = [timePoints, timePointLabels, days, minuteIndices]
-                pool = mp.Pool(processes=threads)
-                poolMap = partial(phototaxisPlotter.plotData, progress=progress, lock=lock, data=data,
-                                  datasheet=datasheet, outputDirectory=outputDirectory, dataNumber=dataNumber,
-                                  informationOfTime=informationOfTime, timePointIndices=timePointIndices,
-                                  plotColor=plotColor, minFirstDay=minFirstDay, minLastDay=minLastDay, maxFirstDay=maxFirstDay,
-                                  maxLastDay=maxLastDay, points=points, amplitudePercentage=amplitudePercentage,
-                                  sgFilter=sgFilter, sgPlotColor=sgPlotColor, windowSize=windowSize, polyOrder=polyOrder,
-                                  period=period, startingPoint=startingPoint, pointSize=pointSize, label=label)
-                pages = pool.map_async(poolMap, columnNames)
-                pool.close()
+                pages = None
+                pool = None
+                if(threads == 1):
+                    app.thread(startSingleThreaded_PlotData, columnNames=columnNames, progress=progress, lock=lock, data=data,
+                               datasheet=datasheet, outputDirectory=outputDirectory, dataNumber=dataNumber,
+                               informationOfTime=informationOfTime, timePointIndices=timePointIndices,
+                               plotColor=plotColor, minFirstDay=minFirstDay, minLastDay=minLastDay, maxFirstDay=maxFirstDay,
+                               maxLastDay=maxLastDay, points=points, amplitudePercentage=amplitudePercentage,
+                               sgFilter=sgFilter, sgPlotColor=sgPlotColor, windowSize=windowSize, polyOrder=polyOrder,
+                               period=period, startingPoint=startingPoint, pointSize=pointSize, label=label)
+                else:
+                    pool = mp.Pool(processes=threads)
+                    poolMap = partial(phototaxisPlotter.plotData, progress=progress, lock=lock, data=data,
+                                      datasheet=datasheet, outputDirectory=outputDirectory, dataNumber=dataNumber,
+                                      informationOfTime=informationOfTime, timePointIndices=timePointIndices,
+                                      plotColor=plotColor, minFirstDay=minFirstDay, minLastDay=minLastDay, maxFirstDay=maxFirstDay,
+                                      maxLastDay=maxLastDay, points=points, amplitudePercentage=amplitudePercentage,
+                                      sgFilter=sgFilter, sgPlotColor=sgPlotColor, windowSize=windowSize, polyOrder=polyOrder,
+                                      period=period, startingPoint=startingPoint, pointSize=pointSize, label=label)
+                    pages = pool.map_async(poolMap, columnNames)
+                    pool.close()
+
                 while(progress.value != len(columnNames)):
                     if(cancelAnalysis):
-                        pool.terminate()
+                        if(threads > 1):
+                            pool.terminate()
+
                         break
 
                     app.setMeter("Progress", (progress.value/progressSize)*100)
@@ -561,9 +587,12 @@ if __name__ == "__main__":
                     app.topLevel.update()
 
                 app.setMeter("Progress", (progress.value/progressSize)*100)
-                app.setStatusbar("Datapoints plotted - " +
+                app.setStatusbar("Plotting datapoints - " +
                                  "{0:.2f}".format((progress.value/progressSize)*100) + " %")
-                pool.join()
+                if(threads > 1):
+                    pool.join()
+                    pages = pages.get()
+
                 compareResults = None
                 if(os.path.exists(outputDirectory + "tmpCompare")):
                     shutil.rmtree(outputDirectory + "tmpCompare", ignore_errors=True)
@@ -572,15 +601,24 @@ if __name__ == "__main__":
                 if(len(comparePlots) and not cancelAnalysis):
                     app.setStatusbar("Comparing plots - " +
                                      "{0:.2f}".format((progress.value/progressSize)*100) + " %")
-                    pool = mp.Pool(processes=threads)
-                    poolMap =  partial(phototaxisPlotter.plotComparePlots, progress=progress, lock=lock,
-                                       plotList=pages.get(), datasheet=datasheet, outputDirectory=outputDirectory,
-                                       informationOfTime=informationOfTime, pointSize=pointSize, label=label)
-                    compareResults = pool.map_async(poolMap, comparePlots)
-                    pool.close()
+                    pool = None
+                    if(threads == 1):
+                        app.thread(startSingleThreaded_PlotComparePlots, comparePlots=comparePlots, progress=progress,
+                                   lock=lock, plotList=pages, datasheet=datasheet, outputDirectory=outputDirectory,
+                                   informationOfTime=informationOfTime, pointSize=pointSize, label=label)
+                    else:
+                        pool = mp.Pool(processes=threads)
+                        poolMap =  partial(phototaxisPlotter.plotComparePlots, progress=progress, lock=lock,
+                                           plotList=pages, datasheet=datasheet, outputDirectory=outputDirectory,
+                                           informationOfTime=informationOfTime, pointSize=pointSize, label=label)
+                        compareResults = pool.map_async(poolMap, comparePlots)
+                        pool.close()
+
                     while(progress.value != len(columnNames) + len(comparePlots)):
                         if(cancelAnalysis):
-                            pool.terminate()
+                            if(threads > 1):
+                                pool.terminate()
+
                             break
 
                         app.setMeter("Progress", (progress.value/progressSize)*100)
@@ -589,9 +627,11 @@ if __name__ == "__main__":
                         app.topLevel.update()
 
                     app.setMeter("Progress", (progress.value/progressSize)*100)
-                    app.setStatusbar("Plots compared - " +
+                    app.setStatusbar("Plotting datapoints - " +
                                      "{0:.2f}".format((progress.value/progressSize)*100) + " %")
-                    pool.join()
+                    if(threads > 1):
+                        pool.join()
+                        compareResults = compareResults.get()
 
                 if(not cancelAnalysis):
                     minimumPhaseList = list()
@@ -601,7 +641,7 @@ if __name__ == "__main__":
                     merger = PdfFileMerger()
                     maxMinimumPeriodLength = 0
                     for sample in columnNames:
-                        sampleResults = next(list(page.values()) for page in pages.get()
+                        sampleResults = next(list(page.values()) for page in pages
                                                   if sample == list(page.keys())[0])[0]
                         samplePage = sampleResults[1]
                         minimumPhaseList.append(sample + ";" + "\n;".join(sampleResults[2]))
@@ -633,7 +673,7 @@ if __name__ == "__main__":
                     if(len(comparePlots)):
                         compareMerger = PdfFileMerger()
                         for samples in comparePlots:
-                            samplesPage = next(list(page.values()) for page in compareResults.get()
+                            samplesPage = next(list(page.values()) for page in compareResults
                                                     if samples == list(page.keys())[0])[0]
                             compareMerger.append(samplesPage)
 
@@ -906,7 +946,10 @@ if __name__ == "__main__":
             app.setEntry(" Amplitude percentage %", 3)
             app.setEntry(" Window size ", 11)
             app.setEntry(" Poly order ", 3)
-            app.setSpinBox(" Thread number ", mp.cpu_count(), callFunction=False)
+            if(os.name == "nt"):
+                app.setSpinBox(" Thread number ", 1, callFunction=False)
+            else:
+                app.setSpinBox(" Thread number ", mp.cpu_count(), callFunction=False)
 
 
 
@@ -958,10 +1001,47 @@ if __name__ == "__main__":
         app.enableMenuItem("Settings", "Header")
         app.enableMenuItem("Settings", "Plot point size")
         app.enableMenuItem("Settings", "Reset settings")
+        app.enableMenuItem("Settings", "Plot point size")
         app.enableMenuItem("Settings", "Plot color")
         app.enableMenuItem("Exit", "Exit PisA")
         if(len(comparePlots)):
             app.enableMenuItem("PisA", "Remove comparing columns")
+
+
+
+    def startSingleThreaded_PlotData(columnNames, progress, lock, data, datasheet, outputDirectory, dataNumber, informationOfTime,
+                                  timePointIndices, plotColor, minFirstDay, minLastDay, maxFirstDay, maxLastDay, points, amplitudePercentage,
+                                  sgFilter, sgPlotColor, windowSize, polyOrder, period, startingPoint, pointSize, label):
+
+        global pages
+
+        pages = list()
+        for sample in columnNames:
+            pageResult = phototaxisPlotter.plotData(sample=sample, progress=progress, lock=lock, data=data,
+                                                    datasheet=datasheet, outputDirectory=outputDirectory, dataNumber=dataNumber,
+                                                    informationOfTime=informationOfTime, timePointIndices=timePointIndices,
+                                                    plotColor=plotColor, minFirstDay=minFirstDay, minLastDay=minLastDay, maxFirstDay=maxFirstDay,
+                                                    maxLastDay=maxLastDay, points=points, amplitudePercentage=amplitudePercentage,
+                                                    sgFilter=sgFilter, sgPlotColor=sgPlotColor, windowSize=windowSize, polyOrder=polyOrder,
+                                                    period=period, startingPoint=startingPoint, pointSize=pointSize, label=label)
+
+            pages.append(pageResult)
+
+
+
+    def startSingleThreaded_PlotComparePlots(comparePlots, progress, lock, plotList, datasheet, outputDirectory,
+                                          informationOfTime, pointSize, label):
+
+        global compareResults
+
+        compareResults = list()
+        for sampleList in comparePlots:
+            pageCompareResult = phototaxisPlotter.plotComparePlots(sampleList=sampleList, progress=progress, lock=lock, plotList=pages,
+                                                                   datasheet=datasheet, outputDirectory=outputDirectory,
+                                                                   informationOfTime=informationOfTime, pointSize=pointSize, label=label)
+
+            compareResults.append(pageCompareResult)
+
 
 
 
