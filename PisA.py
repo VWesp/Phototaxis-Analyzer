@@ -5,48 +5,25 @@ if __name__ == "__main__":
     import multiprocessing as mp
     mp.freeze_support()
 
-    print("========================")
-    print("= Initializing PisA... =")
-    print("========================")
-
-    print("> Loading modules...")
-    print("  -> loading phototaxisPlotter module...", end="\r")
-    import phototaxisPlotter
-    print("\033[K  -> phototaxisPlotter module loaded.")
-    print("  -> loading os module...", end="\r")
-    import os
-    print("\033[K  -> os module loaded.")
-    print("  -> loading shutil module...", end="\r")
-    import shutil
-    print("\033[K  -> shutil module loaded.")
-    print("  -> loading subprocess module...", end="\r")
-    import subprocess
-    print("\033[K  -> subprocess module loaded.")
-    print("  -> loading pandas module...", end="\r")
-    import pandas as pd
-    print("\033[K  -> pandas module loaded.")
-    print("  -> loading numpy module...", end="\r")
-    import numpy as np
-    print("\033[K  -> numpy module loaded.")
-    print("  -> loading traceback module...", end="\r")
-    import traceback
-    print("\033[K  -> traceback module loaded.")
-    print("  -> loading itertools module...", end="\r")
-    import itertools
-    print("\033[K  -> itertools module loaded.")
-    print("  -> loading functools module...", end="\r")
-    from functools import partial
-    print("\033[K  -> functools module loaded.")
-    print("  -> loading PyPDF2 module...", end="\r")
-    from PyPDF2 import PdfFileMerger, PdfFileReader
-    print("\033[K  -> PyPDF2 module loaded.")
-    print("  -> loading appJar module...", end="\r")
     import appJar
-    print("\033[K  -> appJar module loaded.")
-    print("  -> loading tkinter module...", end="\r")
+    app = appJar.gui("PisA", "380x400")
+    app.winIcon = None
+    with app.subWindow("Loading PisA..."):
+        app.addImage("LoadingSun", "icon/loading_sun.gif")
+
+    app.showSubWindow("Loading PisA...")
+
+    import phototaxisPlotter
+    import os
+    import shutil
+    import subprocess
+    import pandas as pd
+    import numpy as np
+    import traceback
+    import itertools
+    from functools import partial
+    from PyPDF2 import PdfFileMerger, PdfFileReader
     from tkinter import *
-    print("\033[K  -> tkinter module loaded.")
-    print("> Modules loaded.")
 
     data = None
     header = 1
@@ -65,11 +42,10 @@ if __name__ == "__main__":
     lbr = None
     progress = None
     lock = None
-
     pages = None
     compareResults = None
 
-    app = appJar.gui("PisA", "380x400")
+    #app = appJar.gui("PisA", "380x400")
 
     def buildAppJarGUI():
 
@@ -80,10 +56,8 @@ if __name__ == "__main__":
         app.setBg("silver", override=True)
         app.setFont(size=12, underline=False, slant="roman")
         app.setLocation(300, 250)
-        app.setIcon("icon/leaning-tower-of-pisa.gif")
         app.setFastStop(True)
         app.setResizable(canResize=False)
-        app.winIcon = None
 
         app.startFrame("TitleFrame")
         app.addLabel("Title", "PisA: [P]hototax[is]-[A]nalyzer")
@@ -389,7 +363,6 @@ if __name__ == "__main__":
                     app.setMeter("Progress", 0)
                     app.setStatusbar("Input file loaded")
             except Exception:
-                print(traceback.format_exc())
                 outputDirectory = ""
                 app.disableMenuItem("PisA", "Start analysis")
                 app.disableMenuItem("PisA", "Compare columns")
@@ -398,8 +371,9 @@ if __name__ == "__main__":
                 app.disableMenuItem("Settings", "Plot point size")
                 app.disableMenuItem("Settings", "Plot color")
                 app.setStatusbar("Error file loading!")
-                app.warningBox("Unexpected error!", "An unexpected error occurred! Please check the error message" +
-                           " in the second window and reload the file!")
+                app.warningBox("File loading error!", "An unexpected error occurred! Please check the error message" +
+                           " in the second window and retry!")
+                app.errorBox("File loading error!", traceback.format_exc())
 
         if(button == "Save"):
             output = app.directoryBox(title="Output directory")
@@ -812,9 +786,9 @@ if __name__ == "__main__":
                 cancelAnalysis = False
             except Exception:
                 app.setStatusbar("Analysis error")
-                print(traceback.format_exc())
                 app.warningBox("Unexpected error!", "An unexpected error occurred! Please check the error" +
-                               " message in the second window and restart the analysis!")
+                               " message in the second window and retry!")
+                app.errorBox("Unexpected error!", traceback.format_exc())
                 enableMenus()
                 if(os.path.exists(outputDirectory + "tmp")):
                     shutil.rmtree(outputDirectory + "tmp", ignore_errors=True)
@@ -1049,23 +1023,11 @@ if __name__ == "__main__":
         manager = mp.Manager()
         progress = manager.Value("i", 0)
         lock = manager.Lock()
-        app.winIcon = None
-
-        print("> Building GUI...", end="\r")
         buildAppJarGUI()
-        print("\033[K> GUI built.")
-
-        print("===============")
-        print("= PisA ready! =")
-        print("===============")
-
+        app.destroySubWindow("Loading PisA...")
         app.go()
         while(not exitApp):
             mainloop() #tkinter
-
-        print("===============")
-        print("= PisA closed! =")
-        print("===============")
     except Exception:
         app.errorBox("Critical error!", traceback.format_exc())
         with open(outputDirectory + "errorLog.txt", "w") as logWriter:
