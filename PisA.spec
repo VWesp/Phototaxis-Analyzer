@@ -4,7 +4,7 @@ block_cipher = None
 
 
 a = Analysis(['PisA.py'],
-             pathex=['C:\\Users\\euidhtn\\Desktop\\Phototaxis-Analyzer'],
+             pathex=['C:\\Users\\euidhtn\\Desktop\\photoaxis_analyzer_v3.7'],
              binaries=[],
              datas=[],
              hiddenimports=[],
