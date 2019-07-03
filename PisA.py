@@ -5,42 +5,20 @@ if __name__ == "__main__":
     import multiprocessing as mp
     mp.freeze_support()
 
-    import appJar
-    import time
-    app = appJar.gui("PisA", "380x400")
-    app.winIcon = None
-    with app.subWindow("Loading PisA..."):
-        with app.labelFrame("Loading image"):
-            app.addImage("LoadingSun", "icon/loading_sun.gif")
-
-        with app.labelFrame("Loading"):
-            app.addEmptyLabel("Loading")
-
-    app.showSubWindow("Loading PisA...")
-
-    app.setLabel("Loading", "Loading phototaxisPlotter module...")
     import phototaxisPlotter
-    app.setLabel("Loading", "Loading os module...")
     import os
-    app.setLabel("Loading", "Loading shutil module...")
     import shutil
-    app.setLabel("Loading", "Loading subprocess module...")
     import subprocess
-    app.setLabel("Loading", "Loading pandas module...")
     import pandas as pd
-    app.setLabel("Loading", "numpy phototaxisPlotter module...")
     import numpy as np
-    app.setLabel("Loading", "Loading traceback module...")
     import traceback
-    app.setLabel("Loading", "Loading itertools module...")
     import itertools
-    app.setLabel("Loading", "Loading functools module...")
     from functools import partial
-    app.setLabel("Loading", "Loading PyPDF2 module...")
     from PyPDF2 import PdfFileMerger, PdfFileReader
-    app.setLabel("Loading", "Loading tkinter module...")
+    import appJar
     from tkinter import *
-    app.setLabel("Loading", "Building GUI...")
+    
+    app = appJar.gui("PisA", "380x400")
 
     data = None
     header = 1
@@ -1041,7 +1019,6 @@ if __name__ == "__main__":
         progress = manager.Value("i", 0)
         lock = manager.Lock()
         buildAppJarGUI()
-        app.hideSubWindow("Loading PisA...")
         app.go()
         while(not exitApp):
             mainloop() #tkinter
