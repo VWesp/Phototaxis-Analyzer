@@ -4,7 +4,7 @@ block_cipher = None
 
 
 a = Analysis(['PisA.py'],
-             pathex=['C:\\Users\\euidhtn\\Desktop\\PisA'],
+             pathex=['C:\\Users\\euidhtn\\Desktop\\photoaxis_analyzer_v3.7'],
              binaries=[],
              datas=[],
              hiddenimports=[],
@@ -26,7 +26,7 @@ exe = EXE(pyz,
           bootloader_ignore_signals=False,
           strip=False,
           upx=True,
-          console=True , icon='icon\\leaning-tower-of-pisa.ico')
+          console=False , icon='icon\\leaning-tower-of-pisa.ico')
 coll = COLLECT(exe,
                a.binaries,
                a.zipfiles,

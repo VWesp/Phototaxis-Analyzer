@@ -18,7 +18,7 @@
 [SG-Filter On]             	True
   [Window size]           	11
   [Polynomial order]      	3
-[Threads]               	4
+[Threads]               	1
 [Compared plots]        
   1 - 2 - 3 - 4 - 5
   6 - 7 - 8 - 9 - 10

@@ -5,48 +5,18 @@ if __name__ == "__main__":
     import multiprocessing as mp
     mp.freeze_support()
 
-    print("========================")
-    print("= Initializing PisA... =")
-    print("========================")
-
-    print("> Loading modules...")
-    print("  -> loading phototaxisPlotter module...", end="\r")
     import phototaxisPlotter
-    print("\033[K  -> phototaxisPlotter module loaded.")
-    print("  -> loading os module...", end="\r")
     import os
-    print("\033[K  -> os module loaded.")
-    print("  -> loading shutil module...", end="\r")
     import shutil
-    print("\033[K  -> shutil module loaded.")
-    print("  -> loading subprocess module...", end="\r")
     import subprocess
-    print("\033[K  -> subprocess module loaded.")
-    print("  -> loading pandas module...", end="\r")
     import pandas as pd
-    print("\033[K  -> pandas module loaded.")
-    print("  -> loading numpy module...", end="\r")
     import numpy as np
-    print("\033[K  -> numpy module loaded.")
-    print("  -> loading traceback module...", end="\r")
     import traceback
-    print("\033[K  -> traceback module loaded.")
-    print("  -> loading itertools module...", end="\r")
     import itertools
-    print("\033[K  -> itertools module loaded.")
-    print("  -> loading functools module...", end="\r")
     from functools import partial
-    print("\033[K  -> functools module loaded.")
-    print("  -> loading PyPDF2 module...", end="\r")
     from PyPDF2 import PdfFileMerger, PdfFileReader
-    print("\033[K  -> PyPDF2 module loaded.")
-    print("  -> loading appJar module...", end="\r")
     import appJar
-    print("\033[K  -> appJar module loaded.")
-    print("  -> loading tkinter module...", end="\r")
     from tkinter import *
-    print("\033[K  -> tkinter module loaded.")
-    print("> Modules loaded.")
 
     data = None
     header = 1
@@ -65,22 +35,24 @@ if __name__ == "__main__":
     lbr = None
     progress = None
     lock = None
+    pages = None
+    compareResults = None
 
     app = appJar.gui("PisA", "380x400")
+    app.winIcon = None
 
     def buildAppJarGUI():
 
         global lbc
         global lbr
 
+        app.setIcon("icon/leaning-tower-of-pisa.gif")
         app.setTitle("PisA")
         app.setBg("silver", override=True)
         app.setFont(size=12, underline=False, slant="roman")
         app.setLocation(300, 250)
-        app.setIcon("icon/leaning-tower-of-pisa.gif")
         app.setFastStop(True)
         app.setResizable(canResize=False)
-        app.winIcon = None
 
         app.startFrame("TitleFrame")
         app.addLabel("Title", "PisA: [P]hototax[is]-[A]nalyzer")
@@ -99,7 +71,7 @@ if __name__ == "__main__":
         app.addMenuRadioButton("Set period", "Period", "Minimum")
         app.addMenuRadioButton("Set period", "Period", "Maximum")
         app.addMenuRadioButton("Set period", "Period", "Both")
-        app.setMenuRadioButton("Set period", "Period", "Minimum")
+        app.setMenuRadioButton("Set period", "Period", "Both")
         app.addMenuSeparator("PisA")
         app.addMenuItem("PisA", "PisA Settings", pisaPress)
         app.disableMenuItem("PisA", "Start analysis")
@@ -128,15 +100,8 @@ if __name__ == "__main__":
             app.addNamedButton("Cancel", "HeaderCancel", fileSettingsPress, row=0, column=1)
             app.stopFrame()
 
-        app.addSubMenu("Settings", "Plot point size")
-        for i in range(1, 21):
-            app.addMenuRadioButton("Plot point size", "Sizes", i)
-
-        app.setMenuRadioButton("Plot point size", "Sizes", 3)
-        app.addMenuItem("Settings", "Plot color", fileSettingsPress)
         app.addMenuSeparator("Settings")
         app.addMenuItem("Settings", "Reset settings", fileSettingsPress)
-        app.disableMenuItem("Settings", "Plot color")
 
         app.createMenu("Exit")
         app.addMenuItem("Exit", "Exit PisA", exitPress)
@@ -167,42 +132,56 @@ if __name__ == "__main__":
             app.setBg("silver", override=True)
             app.setFont(size=12, underline=False, slant="roman")
             app.startFrame("AnalysisOptionsFrame", row=0, column=0)
-            with app.labelFrame("General settings"):
+            with app.labelFrame("General plot settings"):
                 app.addEmptyLabel("AnalysisFiller1")
+                app.startFrame("GeneralOptionsFrame", row=1, column=0)
+                app.addLabelScale(" Plot point size ", row=0, column=0)
+                app.showScaleValue(" Plot point size ", show=True)
+                app.setScaleRange(" Plot point size ", 0, 20, curr=3)
+                app.setScaleIncrement(" Plot point size ", 1/20)
+                app.showScaleIntervals(" Plot point size ", 20)
+                app.addEmptyLabel("GeneralFiller1", row=0, column=1)
+                app.addEmptyLabel("GeneralFiller2", row=0, column=2)
+                app.addEmptyLabel("GeneralFiller3", row=0, column=3)
+                app.addEmptyLabel("GeneralFiller4", row=0, column=4)
+                app.addEmptyLabel("GeneralFiller5", row=0, column=5)
+                app.addNamedButton("Set color", "PlotColor", analysisSettingsPress, row=0, column=6)
+                app.stopFrame()
+                app.addEmptyLabel("AnalysisFiller2")
                 app.addLabelEntry(" Starting point ")
                 app.setEntry(" Starting point ", 12)
-                app.addEmptyLabel("AnalysisFiller2")
+                app.addEmptyLabel("AnalysisFiller3")
                 app.addLabelScale(" Data number ")
                 app.showScaleValue(" Data number ", show=True)
-                app.addEmptyLabel("AnalysisFiller3")
+                app.addEmptyLabel("AnalysisFiller4")
                 app.addLabelScale(" Data minute point ")
                 app.showScaleValue(" Data minute point ", show=True)
-                app.addEmptyLabel("AnalysisFiller4")
+                app.addEmptyLabel("AnalysisFiller5")
                 with app.labelFrame("Minimum"):
-                    app.addEmptyLabel("AnalysisFiller5")
-                    app.addCheckBox(" Exclude first Day [min]", row=0, column=0)
-                    app.addCheckBox(" Exclude last Day [min]", row=0, column=1)
+                    app.addEmptyLabel("AnalysisFiller6", row=0, column=0)
+                    app.addCheckBox(" Exclude first Day [min]", row=1, column=0)
+                    app.addCheckBox(" Exclude last Day [min]", row=1, column=1)
                     app.setCheckBox(" Exclude last Day [min]", ticked=True, callFunction=False)
-                    app.addEmptyLabel("AnalysisFiller6")
+                    app.addEmptyLabel("AnalysisFiller7")
 
                 with app.labelFrame("Maximum"):
-                    app.addEmptyLabel("AnalysisFiller7")
-                    app.addCheckBox(" Exclude first Day [max]", row=0, column=0)
-                    app.addCheckBox(" Exclude last Day [max]", row=0, column=1)
+                    app.addEmptyLabel("AnalysisFiller8", row=0, column=0)
+                    app.addCheckBox(" Exclude first Day [max]", row=1, column=0)
+                    app.addCheckBox(" Exclude last Day [max]", row=1, column=1)
                     app.setCheckBox(" Exclude first Day [max]", ticked=True, callFunction=False)
-                    app.addEmptyLabel("AnalysisFiller8")
+                    app.addEmptyLabel("AnalysisFiller9")
 
             with app.labelFrame("X-axis label"):
-                app.addEmptyLabel("AnalysisFiller9", row=0, column=0)
+                app.addEmptyLabel("AnalysisFiller10", row=0, column=0)
                 app.addRadioButton("Label", "Days", row=1, column=0)
                 app.addRadioButton("Label", "Hours", row=1, column=1)
-                app.addEmptyLabel("AnalysisFiller10")
+                app.addEmptyLabel("AnalysisFiller11")
 
             with app.labelFrame("SG-Filter"):
-                app.addEmptyLabel("AnalysisFiller11", row=0, column=0)
+                app.addEmptyLabel("AnalysisFiller12", row=0, column=0)
                 app.addCheckBox(" SG-Filter On", row=1, column=0)
                 app.addNamedButton("Set color", "SGPlotColor", analysisSettingsPress, row=1, column=1)
-                app.addEmptyLabel("AnalysisFiller12")
+                app.addEmptyLabel("AnalysisFiller13")
 
             app.stopFrame()
             app.startFrame("AnalysisButtonsFrame", row=3, column=0)
@@ -240,7 +219,10 @@ if __name__ == "__main__":
             with app.labelFrame("Threads"):
                 app.addEmptyLabel("AdvancedFiller8")
                 app.addLabelSpinBox(" Thread number ", list(np.arange(1, mp.cpu_count()+1, 1)))
-                app.setSpinBox(" Thread number ", mp.cpu_count(), callFunction=False)
+                if(os.name == "nt"):
+                    app.setSpinBox(" Thread number ", 1, callFunction=False)
+                else:
+                    app.setSpinBox(" Thread number ", mp.cpu_count(), callFunction=False)
                 app.addEmptyLabel("AdvancedFiller9")
 
             app.stopFrame()
@@ -374,23 +356,21 @@ if __name__ == "__main__":
                     app.enableMenuItem("PisA", "Compare columns")
                     app.enableMenuItem("PisA", "Set period")
                     app.enableMenuItem("PisA", "PisA Settings")
-                    app.enableMenuItem("Settings", "Plot color")
                     app.setLabel("Input", " Input: " + datasheet)
                     app.setLabel("Output", " Output: " + outputDirectory)
                     app.setLabel("Plots", " Comparing plots:\n  None")
                     app.setMeter("Progress", 0)
                     app.setStatusbar("Input file loaded")
             except Exception:
-                print(traceback.format_exc())
                 outputDirectory = ""
                 app.disableMenuItem("PisA", "Start analysis")
                 app.disableMenuItem("PisA", "Compare columns")
                 app.disableMenuItem("PisA", "Set period")
                 app.disableMenuItem("PisA", "PisA Settings")
-                app.disableMenuItem("Settings", "Plot color")
                 app.setStatusbar("Error file loading!")
-                app.warningBox("Unexpected error!", "An unexpected error occurred! Please check the error message" +
-                           " in the second window and reload the file!")
+                app.warningBox("File loading error!", "An unexpected error occurred! Please check the error message" +
+                           " in the second window and retry!")
+                app.errorBox("File loading error!", traceback.format_exc())
 
         if(button == "Save"):
             output = app.directoryBox(title="Output directory")
@@ -403,6 +383,8 @@ if __name__ == "__main__":
 
     def pisaPress(button):
 
+        global pages
+        global compareResults
         global cancelAnalysis
 
         if(button == "Start analysis"):
@@ -415,9 +397,7 @@ if __name__ == "__main__":
             app.disableMenuItem("PisA", "Set period")
             app.disableMenuItem("PisA", "PisA Settings")
             app.disableMenuItem("Settings", "Header")
-            app.disableMenuItem("Settings", "Plot point size")
             app.disableMenuItem("Settings", "Reset settings")
-            app.disableMenuItem("Settings", "Plot color")
             app.disableMenuItem("Exit", "Exit PisA")
             app.hideSubWindow("Compare columns")
             app.hideSubWindow("Remove comparing columns")
@@ -439,7 +419,7 @@ if __name__ == "__main__":
                     enableMenus()
                     return
 
-            pointSize = int(app.getMenuRadioButton("Plot point size", "Sizes"))
+            pointSize = int(app.getScale(" Plot point size "))
             minFirstDay = app.getCheckBox(" Exclude first Day [min]")
             minLastDay = app.getCheckBox(" Exclude last Day [min]")
             maxFirstDay = app.getCheckBox(" Exclude first Day [max]")
@@ -540,19 +520,33 @@ if __name__ == "__main__":
                     minuteIndices = np.arange(minuteIndex, len(data["h"]), dataPerMeasurement)
 
                 informationOfTime = [timePoints, timePointLabels, days, minuteIndices]
-                pool = mp.Pool(processes=threads)
-                poolMap = partial(phototaxisPlotter.plotData, progress=progress, lock=lock, data=data,
-                                  datasheet=datasheet, outputDirectory=outputDirectory, dataNumber=dataNumber,
-                                  informationOfTime=informationOfTime, timePointIndices=timePointIndices,
-                                  plotColor=plotColor, minFirstDay=minFirstDay, minLastDay=minLastDay, maxFirstDay=maxFirstDay,
-                                  maxLastDay=maxLastDay, points=points, amplitudePercentage=amplitudePercentage,
-                                  sgFilter=sgFilter, sgPlotColor=sgPlotColor, windowSize=windowSize, polyOrder=polyOrder,
-                                  period=period, startingPoint=startingPoint, pointSize=pointSize, label=label)
-                pages = pool.map_async(poolMap, columnNames)
-                pool.close()
+                pages = None
+                pool = None
+                if(threads == 1):
+                    app.thread(startSingleThreaded_PlotData, columnNames=columnNames, progress=progress, lock=lock, data=data,
+                               datasheet=datasheet, outputDirectory=outputDirectory, dataNumber=dataNumber,
+                               informationOfTime=informationOfTime, timePointIndices=timePointIndices,
+                               plotColor=plotColor, minFirstDay=minFirstDay, minLastDay=minLastDay, maxFirstDay=maxFirstDay,
+                               maxLastDay=maxLastDay, points=points, amplitudePercentage=amplitudePercentage,
+                               sgFilter=sgFilter, sgPlotColor=sgPlotColor, windowSize=windowSize, polyOrder=polyOrder,
+                               period=period, startingPoint=startingPoint, pointSize=pointSize, label=label)
+                else:
+                    pool = mp.Pool(processes=threads)
+                    poolMap = partial(phototaxisPlotter.plotData, progress=progress, lock=lock, data=data,
+                                      datasheet=datasheet, outputDirectory=outputDirectory, dataNumber=dataNumber,
+                                      informationOfTime=informationOfTime, timePointIndices=timePointIndices,
+                                      plotColor=plotColor, minFirstDay=minFirstDay, minLastDay=minLastDay, maxFirstDay=maxFirstDay,
+                                      maxLastDay=maxLastDay, points=points, amplitudePercentage=amplitudePercentage,
+                                      sgFilter=sgFilter, sgPlotColor=sgPlotColor, windowSize=windowSize, polyOrder=polyOrder,
+                                      period=period, startingPoint=startingPoint, pointSize=pointSize, label=label)
+                    pages = pool.map_async(poolMap, columnNames)
+                    pool.close()
+
                 while(progress.value != len(columnNames)):
                     if(cancelAnalysis):
-                        pool.terminate()
+                        if(threads > 1):
+                            pool.terminate()
+
                         break
 
                     app.setMeter("Progress", (progress.value/progressSize)*100)
@@ -561,9 +555,12 @@ if __name__ == "__main__":
                     app.topLevel.update()
 
                 app.setMeter("Progress", (progress.value/progressSize)*100)
-                app.setStatusbar("Datapoints plotted - " +
+                app.setStatusbar("Plotting datapoints - " +
                                  "{0:.2f}".format((progress.value/progressSize)*100) + " %")
-                pool.join()
+                if(threads > 1):
+                    pool.join()
+                    pages = pages.get()
+
                 compareResults = None
                 if(os.path.exists(outputDirectory + "tmpCompare")):
                     shutil.rmtree(outputDirectory + "tmpCompare", ignore_errors=True)
@@ -572,15 +569,24 @@ if __name__ == "__main__":
                 if(len(comparePlots) and not cancelAnalysis):
                     app.setStatusbar("Comparing plots - " +
                                      "{0:.2f}".format((progress.value/progressSize)*100) + " %")
-                    pool = mp.Pool(processes=threads)
-                    poolMap =  partial(phototaxisPlotter.plotComparePlots, progress=progress, lock=lock,
-                                       plotList=pages.get(), datasheet=datasheet, outputDirectory=outputDirectory,
-                                       informationOfTime=informationOfTime, pointSize=pointSize, label=label)
-                    compareResults = pool.map_async(poolMap, comparePlots)
-                    pool.close()
+                    pool = None
+                    if(threads == 1):
+                        app.thread(startSingleThreaded_PlotComparePlots, comparePlots=comparePlots, progress=progress,
+                                   lock=lock, plotList=pages, datasheet=datasheet, outputDirectory=outputDirectory,
+                                   informationOfTime=informationOfTime, pointSize=pointSize, label=label)
+                    else:
+                        pool = mp.Pool(processes=threads)
+                        poolMap =  partial(phototaxisPlotter.plotComparePlots, progress=progress, lock=lock,
+                                           plotList=pages, datasheet=datasheet, outputDirectory=outputDirectory,
+                                           informationOfTime=informationOfTime, pointSize=pointSize, label=label)
+                        compareResults = pool.map_async(poolMap, comparePlots)
+                        pool.close()
+
                     while(progress.value != len(columnNames) + len(comparePlots)):
                         if(cancelAnalysis):
-                            pool.terminate()
+                            if(threads > 1):
+                                pool.terminate()
+
                             break
 
                         app.setMeter("Progress", (progress.value/progressSize)*100)
@@ -589,9 +595,11 @@ if __name__ == "__main__":
                         app.topLevel.update()
 
                     app.setMeter("Progress", (progress.value/progressSize)*100)
-                    app.setStatusbar("Plots compared - " +
+                    app.setStatusbar("Plotting datapoints - " +
                                      "{0:.2f}".format((progress.value/progressSize)*100) + " %")
-                    pool.join()
+                    if(threads > 1):
+                        pool.join()
+                        compareResults = compareResults.get()
 
                 if(not cancelAnalysis):
                     minimumPhaseList = list()
@@ -601,7 +609,7 @@ if __name__ == "__main__":
                     merger = PdfFileMerger()
                     maxMinimumPeriodLength = 0
                     for sample in columnNames:
-                        sampleResults = next(list(page.values()) for page in pages.get()
+                        sampleResults = next(list(page.values()) for page in pages
                                                   if sample == list(page.keys())[0])[0]
                         samplePage = sampleResults[1]
                         minimumPhaseList.append(sample + ";" + "\n;".join(sampleResults[2]))
@@ -633,7 +641,7 @@ if __name__ == "__main__":
                     if(len(comparePlots)):
                         compareMerger = PdfFileMerger()
                         for samples in comparePlots:
-                            samplesPage = next(list(page.values()) for page in compareResults.get()
+                            samplesPage = next(list(page.values()) for page in compareResults
                                                     if samples == list(page.keys())[0])[0]
                             compareMerger.append(samplesPage)
 
@@ -772,9 +780,9 @@ if __name__ == "__main__":
                 cancelAnalysis = False
             except Exception:
                 app.setStatusbar("Analysis error")
-                print(traceback.format_exc())
                 app.warningBox("Unexpected error!", "An unexpected error occurred! Please check the error" +
-                               " message in the second window and restart the analysis!")
+                               " message in the second window and retry!")
+                app.errorBox("Unexpected error!", traceback.format_exc())
                 enableMenus()
                 if(os.path.exists(outputDirectory + "tmp")):
                     shutil.rmtree(outputDirectory + "tmp", ignore_errors=True)
@@ -872,6 +880,7 @@ if __name__ == "__main__":
 
     def analysisSettingsPress(button):
 
+        global plotColor
         global sgPlotColor
 
         if(button == "AnalysisOk"):
@@ -880,10 +889,15 @@ if __name__ == "__main__":
         if(button == "AnalysisAdvanced"):
             app.showSubWindow("Advanced settings")
 
+        if(button == "PlotColor"):
+            plotColor = app.colourBox(colour=plotColor)
+
         if(button == "SGPlotColor"):
             sgPlotColor = app.colourBox(colour=sgPlotColor)
 
         if(button == "AnalysisReset"):
+            app.setScale(" Plot point size ", 3, callFunction=False)
+            plotColor = "#000000"
             app.setEntry(" Starting point ", 12)
             app.setScale(" Data number ", 5, callFunction=False)
             app.setScale(" Data minute point ", -1, callFunction=False)
@@ -906,14 +920,16 @@ if __name__ == "__main__":
             app.setEntry(" Amplitude percentage %", 3)
             app.setEntry(" Window size ", 11)
             app.setEntry(" Poly order ", 3)
-            app.setSpinBox(" Thread number ", mp.cpu_count(), callFunction=False)
+            if(os.name == "nt"):
+                app.setSpinBox(" Thread number ", 1, callFunction=False)
+            else:
+                app.setSpinBox(" Thread number ", mp.cpu_count(), callFunction=False)
 
 
 
     def fileSettingsPress(button):
 
         global header
-        global plotColor
 
         if(button == "Header"):
             app.showSubWindow("Header settings")
@@ -925,14 +941,9 @@ if __name__ == "__main__":
             app.hideSubWindow("Header settings")
             app.setEntry(" Header line ", header)
 
-        if(button == "Plot color"):
-            plotColor = app.colourBox(colour=plotColor)
-
         if(button == "Reset settings"):
             header = 1
             app.setEntry(" Header line ", header)
-            app.setMenuRadioButton("Plot point size", "Sizes", 3)
-            plotColor = "#000000"
 
 
 
@@ -956,12 +967,46 @@ if __name__ == "__main__":
         app.enableMenuItem("PisA", "Set period")
         app.enableMenuItem("PisA", "PisA Settings")
         app.enableMenuItem("Settings", "Header")
-        app.enableMenuItem("Settings", "Plot point size")
         app.enableMenuItem("Settings", "Reset settings")
-        app.enableMenuItem("Settings", "Plot color")
         app.enableMenuItem("Exit", "Exit PisA")
         if(len(comparePlots)):
             app.enableMenuItem("PisA", "Remove comparing columns")
+
+
+
+    def startSingleThreaded_PlotData(columnNames, progress, lock, data, datasheet, outputDirectory, dataNumber, informationOfTime,
+                                  timePointIndices, plotColor, minFirstDay, minLastDay, maxFirstDay, maxLastDay, points, amplitudePercentage,
+                                  sgFilter, sgPlotColor, windowSize, polyOrder, period, startingPoint, pointSize, label):
+
+        global pages
+
+        pages = list()
+        for sample in columnNames:
+            pageResult = phototaxisPlotter.plotData(sample=sample, progress=progress, lock=lock, data=data,
+                                                    datasheet=datasheet, outputDirectory=outputDirectory, dataNumber=dataNumber,
+                                                    informationOfTime=informationOfTime, timePointIndices=timePointIndices,
+                                                    plotColor=plotColor, minFirstDay=minFirstDay, minLastDay=minLastDay, maxFirstDay=maxFirstDay,
+                                                    maxLastDay=maxLastDay, points=points, amplitudePercentage=amplitudePercentage,
+                                                    sgFilter=sgFilter, sgPlotColor=sgPlotColor, windowSize=windowSize, polyOrder=polyOrder,
+                                                    period=period, startingPoint=startingPoint, pointSize=pointSize, label=label)
+
+            pages.append(pageResult)
+
+
+
+    def startSingleThreaded_PlotComparePlots(comparePlots, progress, lock, plotList, datasheet, outputDirectory,
+                                          informationOfTime, pointSize, label):
+
+        global compareResults
+
+        compareResults = list()
+        for sampleList in comparePlots:
+            pageCompareResult = phototaxisPlotter.plotComparePlots(sampleList=sampleList, progress=progress, lock=lock, plotList=pages,
+                                                                   datasheet=datasheet, outputDirectory=outputDirectory,
+                                                                   informationOfTime=informationOfTime, pointSize=pointSize, label=label)
+
+            compareResults.append(pageCompareResult)
+
 
 
 
@@ -969,23 +1014,10 @@ if __name__ == "__main__":
         manager = mp.Manager()
         progress = manager.Value("i", 0)
         lock = manager.Lock()
-        app.winIcon = None
-
-        print("> Building GUI...", end="\r")
         buildAppJarGUI()
-        print("\033[K> GUI built.")
-
-        print("===============")
-        print("= PisA ready! =")
-        print("===============")
-
         app.go()
         while(not exitApp):
             mainloop() #tkinter
-
-        print("===============")
-        print("= PisA closed! =")
-        print("===============")
     except Exception:
         app.errorBox("Critical error!", traceback.format_exc())
         with open(outputDirectory + "errorLog.txt", "w") as logWriter:
