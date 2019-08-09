@@ -3,6 +3,7 @@ from tkinter import filedialog
 import tkinter.colorchooser as tkcc
 import tkinter.ttk as ttk
 import os
+import sys
 import pandas as pd
 import numpy as np
 
@@ -12,7 +13,8 @@ input_list["All"] = {"path": [], "output": None, "pointsize": 3, "startingpoint"
                      "minimum": {"exclude_firstday": False, "exclude_lastday": True},
                      "maximum": {"exclude_firstday": True, "exclude_lastday": False}, "xlabel": "Days",
                      "sg_filter": {"on": False, "window": 11, "poly": 3, "color": "#800000"},
-                     "pv_points": 1, "pv_amp_per": 3}
+                     "pv_points": 1, "pv_amp_per": 3, "data_per_measurement": sys.maxsize,
+                     "timepoint_indices": [], "data_minutepoints": sys.maxsize, "file_names": []}
 
 class Application(tk.Frame):
 
@@ -64,11 +66,18 @@ class Application(tk.Frame):
         file = filedialog.askopenfilename(title = "Select phototaxis file",
                                           filetypes = (("text files","*.txt"),("all files","*.*")))
         if(len(file)):
+            if(not len(input_list["All"]["path"])):
+                menu.entryconfig("PisA analysis", state="normal")
+                option_menu.configure(state="normal")
+                input_list["All"]["output"] = os.path.dirname(file) + "/"
+
             file_list = ["Files"]
             for entry in input_list:
                 file_list.append(entry)
 
             file_name = os.path.basename(file)
+            input_list["All"]["path"].append(file)
+            input_list["All"]["file_names"].append(file_name)
             if(not file_name in file_list):
                 input_list[file_name] = {"path": file, "output": os.path.dirname(file) + "/", "pointsize": 3,
                                          "startingpoint": 12, "datanumber": 5, "minutepoint": -1, "period": "Both",
@@ -89,18 +98,18 @@ class Application(tk.Frame):
                         input_list[file_name]["timepoint_indices"] = np.arange(
                                                     input_list[file_name]["data_per_measurement"], len(data[column]),
                                                     input_list[file_name]["data_per_measurement"])
-                        input_list[file_name]["data_minutepoints"] = (60 * (data[column] % 1)).astype(column)
-                        if(len(input_list) == 2):
-                            if(not len(input_list["All"]["path"])):
-                                input_list["All"]["output"] = os.path.dirname(file) + "/"
-                                input_list["All"]["data_per_measurement"] = input_list[file_name]["data_per_measurement"]
-                                input_list["All"]["timepoint_indices"] = input_list[file_name]["timepoint_indices"]
-                                input_list["All"]["data_minutepoints"] = input_list[file_name]["data_minutepoints"]
+                        input_list[file_name]["data_minutepoints"] = np.unique(
+                                                    (60 * (data[column] % 1)).astype(int))[-1]
+                        if(input_list[file_name]["data_per_measurement"] < input_list["All"]["data_per_measurement"]):
+                            input_list["All"]["data_per_measurement"] = input_list[file_name]["data_per_measurement"]
 
-                            input_list["All"]["path"].append(file)
-                            menu.entryconfig("PisA analysis", state="normal")
-                            option_menu.configure(state="normal")
+                        if(len(input_list[file_name]["timepoint_indices"]) <
+                                                    len(input_list["All"]["timepoint_indices"]) or
+                                                    not len(input_list[file_name]["timepoint_indices"])):
+                            input_list["All"]["timepoint_indices"] = input_list[file_name]["timepoint_indices"]
 
+                        if(input_list[file_name]["data_minutepoints"] < input_list["All"]["data_minutepoints"]):
+                            input_list["All"]["data_minutepoints"] = input_list[file_name]["data_minutepoints"]
 
                 input_list[file_name]["data"] = data
 
@@ -109,18 +118,25 @@ class Application(tk.Frame):
         column_window.wm_title("Comparing columns")
 
         column_frame = tk.LabelFrame(column_window, text="Columns", borderwidth=2, relief="groove")
-        column_names = list(input_list[option_menu_var.get()]["data"])[2:]
+        data_columns = None
+        if(option_menu_var.get() == "All"):
+            data_columns = input_list[option_menu_var.get()]["file_names"]
+        else:
+            data_columns = [option_menu_var.get()]
+
         row_frame = None
         set_columns = {}
-        for column_index in range(len(column_names)):
-            if(column_index % 6 == 0):
-                row_frame = tk.Frame(column_frame)
+        for data_index in data_columns:
+            column_names = list(input_list[data_index]["data"])[2:]
+            for column_index in range(len(column_names)):
+                if(column_index % 6 == 0):
+                    row_frame = tk.Frame(column_frame)
 
-            column_var = tk.BooleanVar()
-            tk.Checkbutton(row_frame, text=" "+column_names[column_index], var=column_var).pack(side="left")
-            set_columns[column_names[column_index]] = column_var
-            if(column_index % 6 == 0):
-                row_frame.pack(fill="both", expand=1)
+                column_var = tk.BooleanVar()
+                tk.Checkbutton(row_frame, text=" "+column_names[column_index], var=column_var).pack(side="left")
+                set_columns[column_names[column_index]] = column_var
+                if(column_index % 6 == 0):
+                    row_frame.pack(fill="both", expand=1)
 
         column_frame.pack()
 
@@ -155,7 +171,7 @@ class Application(tk.Frame):
                                           input_list[option_menu_var.get()]["data_per_measurement"], 4)
         minute_point = self.buildLabelScale(general_settings_frame, "Set data minute point",
                                            input_list[option_menu_var.get()]["minutepoint"], -1,
-                                           np.unique(input_list[option_menu_var.get()]["data_minutepoints"])[-1], 4)
+                                           input_list[option_menu_var.get()]["data_minutepoints"], 4)
 
         plot_color = tk.Button(general_settings_frame, text="Set color of plot", command=lambda:
                                self.setPlotColor("Plot color", input_list[option_menu_var.get()]["color"])).pack()
@@ -230,7 +246,6 @@ class Application(tk.Frame):
 
         true_columns = [col for col,val in set_columns.items() if val.get()]
         input_list[option_menu_var.get()]["set_columns"] = true_columns
-        print(input_list[option_menu_var.get()])
 
     def setGeneralSettings(self, window, option_menu_var, point_size, starting_point, data_number, minute_point,
                            period, plot_color, minimum_exclude, maximum_exclude, x_label, sg_filter, sg_plot_color):
