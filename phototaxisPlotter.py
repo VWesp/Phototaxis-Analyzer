@@ -7,9 +7,10 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 
 def plotData(sample, progress, lock, data, datasheet, outputDirectory, dataNumber, informationOfTime,
-             timePointIndices, plotColor, minFirstDay, minLastDay, maxFirstDay, maxLastDay, points, amplitudePercentage,
-             sgFilter, sgPlotColor, windowSize, polyOrder, period, startingPoint, pointSize, label):
-    
+             timePointIndices, plotColor, minFirstDay, minLastDay, maxFirstDay, maxLastDay, points,
+             amplitudePercentage, sgFilter, sgPlotColor, windowSize, polyOrder, period, startingPoint,\
+             pointSize, label):
+
     timePoints = informationOfTime[0]
     timePointLabels = informationOfTime[1]
     days = informationOfTime[2]
@@ -132,16 +133,19 @@ def plotData(sample, progress, lock, data, datasheet, outputDirectory, dataNumbe
                 plt.plot([meanTime, meanTime], [top, bottom], color="black", linestyle="-")
                 maximumPhaseList.append(str(meanTime%24).replace(".", ",") + ";" + str(meanPeak).replace(".", ","))
                 lastPeak = meanTime
-    
+
     props = dict(boxstyle='round', facecolor='white', alpha=0.15)
     if(period == "Minimum"):
-        plt.gcf().text(0.955, 0.5, "mean min period: " + "{0:.2f}".format(meanMinimumPeriod / minimumPeriods) + "h", bbox=props)
+        plt.gcf().text(0.955, 0.5, "mean min period: " + "{0:.2f}".format(meanMinimumPeriod / minimumPeriods) + "h",
+                       bbox=props)
     elif(period == "Maximum"):
-        plt.gcf().text(0.955, 0.5, "mean max period: " + "{0:.2f}".format(meanMaximunPeriod / maximumPeriods) + "h", bbox=props)
+        plt.gcf().text(0.955, 0.5, "mean max period: " + "{0:.2f}".format(meanMaximunPeriod / maximumPeriods) + "h",
+                      bbox=props)
     else:
-        plt.gcf().text(0.955, 0.5, "mean max period: " + "{0:.2f}".format(meanMaximunPeriod / maximumPeriods) + "h\n\n" +
-                       "mean min period: " + "{0:.2f}".format(meanMinimumPeriod / minimumPeriods) + "h", bbox=props)
-        
+        plt.gcf().text(0.955, 0.5, "mean max period: " + "{0:.2f}".format(meanMaximunPeriod / maximumPeriods) +
+                       "h\n\n" + "mean min period: " + "{0:.2f}".format(meanMinimumPeriod / minimumPeriods) + "h",
+                       bbox=props)
+
     figure.savefig(outputDirectory + "tmp/" + sample + ".pdf", bbox_inches="tight")
     plt.close()
     with lock:
