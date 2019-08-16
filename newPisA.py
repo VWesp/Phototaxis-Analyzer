@@ -2,9 +2,9 @@ if __name__ == "__main__":
     import multiprocessing as mp
     mp.freeze_support()
     import tkinter as tk
+    from tkinter import ttk
     from tkinter import filedialog
     import tkinter.colorchooser as tkcc
-    import tkinter.ttk as ttk
     import os
     import sys
     import pandas as pd
@@ -12,146 +12,146 @@ if __name__ == "__main__":
     import phototaxisPlotter
     from functools import partial
 
-    input_list = dict()
-    input_list["All"] = {"path": list(), "output": None, "pointsize": 3, "startingpoint": 12, "datanumber": 5,
-                         "minutepoint": -1, "period": "Both", "color": "#000000",
-                         "minimum": {"exclude_firstday": False, "exclude_lastday": True},
-                         "maximum": {"exclude_firstday": True, "exclude_lastday": False}, "xlabel": "Days",
-                         "sg_filter": {"on": False, "window": 11, "poly": 3, "color": "#800000"},
-                         "pv_points": 1, "pv_amp_per": 3, "data_per_measurement": sys.maxsize,
-                         "timepoint_indices": list(), "data_minutepoints": sys.maxsize, "file_names": [],
-                         "set_columns": dict()}
-
     class Application(tk.Frame):
 
         def __init__(self, master=None):
+            self.input_list = dict()
+            self.input_list["All"] = {"path": list(), "output": None, "pointsize": 3, "startingpoint": 12, "datanumber": 5,
+                                 "minutepoint": -1, "period": "Both", "color": "#000000",
+                                 "minimum": {"exclude_firstday": False, "exclude_lastday": True},
+                                 "maximum": {"exclude_firstday": True, "exclude_lastday": False}, "xlabel": "Days",
+                                 "sg_filter": {"on": False, "window": 11, "poly": 3, "color": "#800000"},
+                                 "pv_points": 1, "pv_amp_per": 3, "data_per_measurement": sys.maxsize,
+                                 "timepoint_indices": list(), "data_minutepoints": sys.maxsize, "file_names": [],
+                                 "set_columns": dict()}
             tk.Frame.__init__(self, master)
             self.master = master
             self.initWindow()
 
         def initWindow(self):
-            progress_frame = tk.LabelFrame(self, text="Analysis progress", borderwidth=2, relief="groove")
-            progress = tk.DoubleVar()
-            ttk.Progressbar(progress_frame, orient="horizontal", mode="determinate", variable=progress,
+            self.progress_frame = tk.LabelFrame(self, text="Analysis progress", borderwidth=2, relief="groove")
+            self.progress = tk.DoubleVar()
+            ttk.Progressbar(self.progress_frame, orient="horizontal", mode="determinate", variable=self.progress,
                             length=380).pack()
-            progress_frame.pack()
+            self.progress_frame.pack()
 
             self.master.title("PisA - [P]hototax[is]-[A]nalyzer")
             self.pack(fill="both", expand=1)
-            files_frame = tk.LabelFrame(self, text="Files", borderwidth=2, relief="groove")
-            file_options_frame = tk.Frame(files_frame)
-            file_options_var = tk.StringVar()
-            file_options_var.set("Files")
-            file_options = ttk.OptionMenu(file_options_frame, file_options_var, *["Files"],
-                           command=lambda _: self.checkFileComparing(info_frame, file, file_options_var))
-            file_options.pack()
-            file_options.configure(state="disabled")
-            file_options_frame.pack()
-            header_line = self.buildLabelSpinbox(files_frame, "Set header line of file", 1, 1, 2)
-            files_frame.pack(fill="both", expand=0)
+            self.files_frame = tk.LabelFrame(self, text="Files", borderwidth=2, relief="groove")
+            self.file_options_frame = tk.Frame(self.files_frame)
+            self.file_options_var = tk.StringVar()
+            self.file_options_var.set("Files")
+            self.file_options = ttk.OptionMenu(self.file_options_frame, self.file_options_var, *["Files"],
+                           command=lambda _:self.checkFileComparing())
+            self.file_options.pack()
+            self.file_options.configure(state="disabled")
+            self.file_options_frame.pack()
+            self.header_line = self.buildLabelSpinbox(self.files_frame, "Set header line of file", 1, 1, 2)
+            self.files_frame.pack(fill="both", expand=0)
 
-            info_frame = tk.LabelFrame(self, borderwidth=3, relief="sunken")
-            info_frame.pack(side="right", fill="y")
+            self.canvas = tk.Canvas(self, borderwidth=3, relief="sunken")
+            self.info_frame = tk.LabelFrame(self.canvas, borderwidth=0)
+            self.info_scrollbar = tk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
+            self.canvas.configure(yscrollcommand=self.info_scrollbar.set, scrollregion=self.canvas.bbox("all"))
+            self.info_scrollbar.pack(side="right", fill="y")
+            self.info_frame.pack(fill="both", expand=1)
+            self.canvas.pack(fill="both", expand=1)
+            self.canvas.create_window((0,0), window=self.info_frame)
+            self.info_frame.bind("<Configure>", self.configureScrollbar)
 
-            menu = tk.Menu(self.master)
-            self.master.config(menu=menu)
-            file = tk.Menu(menu, tearoff=0)
-            file.add_command(label="Open", command=lambda: self.openFile(menu, file, file_options, file_options_var,
-                             info_frame, header_line))
-            file.add_separator()
-            file.add_command(label="Compare files", command=lambda:
-                             self.configureFilesWindow(info_frame, file_options, file_options_var, file))
-            file.add_command(label="Remove compared files", command=lambda:
-                             self.configureRemoveFilesWindow(info_frame, file_options, file_options_var, menu, file))
-            file.add_command(label="Show compared files", command=lambda: self.showComparisons(info_frame,
-                             file_options_var, 2))
-            file.entryconfig("Compare files", state="disabled")
-            file.entryconfig("Remove compared files", state="disabled")
-            file.entryconfig("Show compared files", state="disabled")
-            menu.add_cascade(label="Files", menu=file)
-            pisa = tk.Menu(menu, tearoff=0)
-            pisa.add_command(label="Start analysis", command=lambda:
-                             self.startPhotoaxisAnalysis(file_options_var, menu, pisa, progress))
-            pisa.add_command(label="Cancel analysis")
-            pisa.add_separator()
-            pisa.add_command(label="Compare columns", command=lambda:
-                             self.configureColumnWindow(info_frame, file_options_var))
-            pisa.add_command(label="Remove compared columns", command=lambda:
-                             self.configureRemoveColumnsWindow(info_frame, file_options_var))
-            pisa.add_command(label="Show compared columns", command=lambda: self.showComparisons(info_frame,
-                             file_options_var, 2))
-            pisa.add_separator()
-            pisa.add_command(label="Settings", command=lambda: self.configureSettings(file_options_var))
-            pisa.entryconfig("Cancel analysis", state="disabled")
-            menu.add_cascade(label="PisA analysis", menu=pisa)
-            menu.entryconfig("PisA analysis", state="disabled")
-            exit = tk.Menu(menu, tearoff=0)
-            exit.add_command(label="Exit PisA", command=self.closeApplication)
-            menu.add_cascade(label="Exit", menu=exit)
+            self.menu = tk.Menu(self.master)
+            self.master.config(menu=self.menu)
+            self.file = tk.Menu(self.menu, tearoff=0)
+            self.file.add_command(label="Open", command=self.openFile)
+            self.file.add_separator()
+            self.file.add_command(label="Compare files", command=lambda:
+                             self.configureFilesWindow(self.info_frame, self.file_options, self.file_options_var, self.file))
+            self.file.add_command(label="Remove compared files", command=lambda:
+                             self.configureRemoveFilesWindow(self.info_frame, self.file_options, self.file_options_var, self.menu, self.file))
+            self.file.add_command(label="Show compared files", command=lambda: self.showComparisons(self.info_frame,
+                             self.file_options_var, 2))
+            self.file.entryconfig("Compare files", state="disabled")
+            self.file.entryconfig("Remove compared files", state="disabled")
+            self.file.entryconfig("Show compared files", state="disabled")
+            self.menu.add_cascade(label="Files", menu=self.file)
+            self.pisa = tk.Menu(self.menu, tearoff=0)
+            self.pisa.add_command(label="Start analysis", command=lambda:
+                             self.startPhotoaxisAnalysis(self.file_options_var, self.menu, self.pisa, self.progress))
+            self.pisa.add_command(label="Cancel analysis")
+            self.pisa.add_separator()
+            self.pisa.add_command(label="Compare columns", command=lambda:
+                             self.configureColumnWindow(self.info_frame, self.file_options_var))
+            self.pisa.add_command(label="Remove compared columns", command=lambda:
+                             self.configureRemoveColumnsWindow(self.info_frame, self.file_options_var))
+            self.pisa.add_command(label="Show compared columns", command=lambda: self.showComparisons(self.info_frame,
+                             self.file_options_var, 2))
+            self.pisa.add_separator()
+            self.pisa.add_command(label="Settings", command=lambda: self.configureSettings(self.file_options_var))
+            self.pisa.entryconfig("Cancel analysis", state="disabled")
+            self.menu.add_cascade(label="PisA analysis", menu=self.pisa)
+            self.menu.entryconfig("PisA analysis", state="disabled")
+            self.exit = tk.Menu(self.menu, tearoff=0)
+            self.exit.add_command(label="Exit PisA", command=self.closeApplication)
+            self.menu.add_cascade(label="Exit", menu=self.exit)
 
-        def openFile(self, menu, file_menu, option_menu, option_menu_var, parent_frame, header_line):
-            global input_list
-
+        def openFile(self):
             file = filedialog.askopenfilename(title = "Select phototaxis file",
                                               filetypes = (("text files","*.txt"),("all files","*.*")))
             if(len(file)):
-                if(not len(input_list["All"]["file_names"])):
-                    file_menu.entryconfig("Compare files", state="normal")
-                    file_menu.entryconfig("Show compared files", state="normal")
-                    menu.entryconfig("PisA analysis", state="normal")
-                    option_menu.configure(state="normal")
-                    input_list["All"]["output"] = "/".join(os.path.dirname(file).split("/")[:-1]) + "/all/"
+                if(not len(self.input_list["All"]["file_names"])):
+                    self.file.entryconfig("Compare files", state="normal")
+                    self.file.entryconfig("Show compared files", state="normal")
+                    self.menu.entryconfig("PisA analysis", state="normal")
+                    self.file_options.configure(state="normal")
+                    self.input_list["All"]["output"] = "/".join(os.path.dirname(file).split("/")[:-1]) + "/all/"
 
-                file_list = ["Files"]
-                for entry in input_list:
-                    file_list.append(entry)
-
+                file_options_list = ["Files"] + list(self.input_list.keys())
                 file_name = os.path.basename(file)
-                if(not file_name in file_list):
-                    file_menu.entryconfig("Remove compared files", state="normal")
-                    input_list["All"]["file_names"].append(file_name)
-                    input_list[file_name] = {"path": file, "output": os.path.dirname(file) + "/", "pointsize": 3,
+                if(not file_name in file_options_list):
+                    self.file.entryconfig("Remove compared files", state="normal")
+                    self.input_list["All"]["file_names"].append(file_name)
+                    self.input_list[file_name] = {"path": file, "output": os.path.dirname(file) + "/", "pointsize": 3,
                                              "startingpoint": 12, "datanumber": 5, "minutepoint": -1, "period": "Both",
                                              "color": "#000000", "minimum": {"exclude_firstday": False,
                                              "exclude_lastday": True}, "maximum": {"exclude_firstday": True,
                                              "exclude_lastday": False}, "xlabel": "Days", "sg_filter": {"on": False,
                                              "window": 11, "poly": 3, "color": "#800000"}, "pv_points": 1,
                                              "pv_amp_per": 3, "set_columns": dict(), "file_names": [file_name]}
-                    file_list.append(file_name)
-                    option_menu.set_menu(*file_list)
-                    option_menu_var.set(file_name)
-                    data = pd.read_csv(file, sep="\t", header=int(header_line.get()), encoding="iso-8859-1")
+                    file_options_list.append(file_name)
+                    self.file_options.set_menu(*file_options_list)
+                    self.file_options_var.set(file_name)
+                    data = pd.read_csv(file, sep="\t", header=int(self.header_line.get()), encoding="iso-8859-1")
                     for column in data:
                         data[column] = data[column].str.replace(",", ".").astype(float)
                         data_int = data[column].astype(int)
                         if(column == "h"):
-                            input_list[file_name]["data_per_measurement"] = np.argmax(np.array(data_int > 0))
-                            input_list[file_name]["timepoint_indices"] = np.arange(
-                                                        input_list[file_name]["data_per_measurement"],
+                            self.input_list[file_name]["data_per_measurement"] = np.argmax(np.array(data_int > 0))
+                            self.input_list[file_name]["timepoint_indices"] = np.arange(
+                                                        self.input_list[file_name]["data_per_measurement"],
                                                         len(data[column]),
-                                                        input_list[file_name]["data_per_measurement"])
-                            input_list[file_name]["data_minutepoints"] = np.unique(
+                                                        self.input_list[file_name]["data_per_measurement"])
+                            self.input_list[file_name]["data_minutepoints"] = np.unique(
                                                         (60 * (data[column] % 1)).astype(int))[-1]
-                            if(input_list[file_name]["data_per_measurement"] < input_list["All"]["data_per_measurement"]):
-                                input_list["All"]["data_per_measurement"] = input_list[file_name]["data_per_measurement"]
+                            if(self.input_list[file_name]["data_per_measurement"] < self.input_list["All"]["data_per_measurement"]):
+                                self.input_list["All"]["data_per_measurement"] = self.input_list[file_name]["data_per_measurement"]
 
-                            if(len(input_list[file_name]["timepoint_indices"]) <
-                                                        len(input_list["All"]["timepoint_indices"]) or
-                                                        not len(input_list[file_name]["timepoint_indices"])):
-                                input_list["All"]["timepoint_indices"] = input_list[file_name]["timepoint_indices"]
+                            if(len(self.input_list[file_name]["timepoint_indices"]) <
+                                                        len(self.input_list["All"]["timepoint_indices"]) or
+                                                        not len(self.input_list[file_name]["timepoint_indices"])):
+                                self.input_list["All"]["timepoint_indices"] = self.input_list[file_name]["timepoint_indices"]
 
-                            if(input_list[file_name]["data_minutepoints"] < input_list["All"]["data_minutepoints"]):
-                                input_list["All"]["data_minutepoints"] = input_list[file_name]["data_minutepoints"]
+                            if(self.input_list[file_name]["data_minutepoints"] < self.input_list["All"]["data_minutepoints"]):
+                                self.input_list["All"]["data_minutepoints"] = self.input_list[file_name]["data_minutepoints"]
 
-                    input_list[file_name]["data"] = data
+                    self.input_list[file_name]["data"] = data
 
-                self.showComparisons(parent_frame, option_menu_var, 2)
+                self.showComparisons()
 
-        def startPhotoaxisAnalysis(self, option_menu_var, menu, pisa_menu, progress):
-            self.disableMenus(menu, pisa_menu)
-            files = input_list[option_menu_var.get()]["file_names"]
+        def startPhotoaxisAnalysis(self):
+            self.disableMenus(self.menu, self.pisa)
+            files = self.input_list[self.file_options_var.get()]["file_names"]
             for file in files:
-                columns = list(input_list[file]["data"])[2:]
+                columns = list(self.input_list[file]["data"])[2:]
                 pool = mp.Pool(processes=mp.cpu_count())
                 pool_map = partial(func, input_list)
                 pdf_single_pages = pool.map_async(pool_map, columns)
@@ -159,13 +159,13 @@ if __name__ == "__main__":
 
                 pool.join()
 
-            self.enableMenus(menu, pisa_menu)
+            self.enableMenus(menu, self.pisa)
 
-        def configureFilesWindow(self, parent_frame, option_menu, option_menu_var, file_menu):
-            files_window = tk.Toplevel(self)
-            files_window.wm_title("Comparing files")
+        def configureFilesWindow(self):
+            self.files_window = tk.Toplevel(self)
+            self.files_window.wm_title("Comparing files")
 
-            label_frame = tk.Frame(files_window)
+            label_frame = tk.Frame(self.files_window)
             label_text = tk.StringVar()
             label_text.set("Set name of group")
             tk.Label(label_frame, textvariable=label_text, height=2).pack(side="left")
@@ -174,7 +174,7 @@ if __name__ == "__main__":
             tk.Entry(label_frame, textvariable=name).pack(side="left")
             label_frame.pack(fill="both", expand=1, pady=5)
 
-            file_frame = tk.LabelFrame(files_window, text="Files", borderwidth=2, relief="groove")
+            file_frame = tk.LabelFrame(self.files_window, text="Files", borderwidth=2, relief="groove")
             set_files = dict()
             for file in list(input_list.keys())[1:]:
                 row_frame = tk.Frame(file_frame)
@@ -185,21 +185,20 @@ if __name__ == "__main__":
 
             file_frame.pack()
 
-            button_frame = tk.Frame(files_window)
+            button_frame = tk.Frame(self.files_window)
             tk.Button(button_frame, text="Set", command=lambda:
-                      self.setFiles(parent_frame, option_menu, option_menu_var, file_menu,
-                      set_files, name)).pack(side="left", padx=30)
+                      self.setFiles(set_files, name)).pack(side="left", padx=30)
             tk.Button(button_frame, text="Close", command=lambda:
-                      self.closeWindow(files_window)).pack(side="left", padx=30)
+                      self.files_window.closeWindow).pack(side="left", padx=30)
             button_frame.pack(fill="both", expand=1, pady=5)
 
-        def configureColumnWindow(self, parent_frame, option_menu_var):
-            column_window = tk.Toplevel(self)
-            column_window.wm_title("Comparing columns")
+        def configureColumnWindow(self):
+            self.column_window = tk.Toplevel(self)
+            self.column_window.wm_title("Comparing columns")
 
-            column_frame = tk.LabelFrame(column_window, text="Columns", borderwidth=2, relief="groove")
+            column_frame = tk.LabelFrame(self.column_window, text="Columns", borderwidth=2, relief="groove")
             set_column_data = dict()
-            for data_index in input_list[option_menu_var.get()]["file_names"]:
+            for data_index in input_list[self.file_options_var.get()]["file_names"]:
                 data_frame = tk.LabelFrame(column_frame, text=data_index, borderwidth=2, relief="groove")
                 columns = list(input_list[data_index]["data"])[2:]
                 set_columns = dict()
@@ -219,19 +218,19 @@ if __name__ == "__main__":
 
             column_frame.pack()
 
-            button_frame = tk.Frame(column_window)
+            button_frame = tk.Frame(self.column_window)
             tk.Button(button_frame, text="Set", command=lambda:
-                      self.setColumns(parent_frame, option_menu_var, set_column_data)).pack(side="left", padx=30)
+                      self.info_frame.setColumns(set_column_data)).pack(side="left", padx=30)
             tk.Button(button_frame, text="Close", command=lambda:
-                      self.closeWindow(column_window)).pack(side="left", padx=30)
+                      self.column_window.closeWindow).pack(side="left", padx=30)
             button_frame.pack(fill="both", expand=1, pady=5)
 
-        def configureRemoveFilesWindow(self, parent_frame, option_menu, option_menu_var, menu, file_menu):
-            remove_window = tk.Toplevel(self)
-            remove_window.wm_title("Remove set files")
+        def configureRemoveFilesWindow(self):
+            self.remove_files_window = tk.Toplevel(self)
+            self.remove_files_window.wm_title("Remove set files")
 
-            remove_frame = tk.LabelFrame(remove_window, text="Compared files", borderwidth=2, relief="groove")
-            files = input_list[option_menu_var.get()]["file_names"]
+            remove_frame = tk.LabelFrame(self.remove_files_window, text="Compared files", borderwidth=2, relief="groove")
+            files = input_list[self.file_options_var.get()]["file_names"]
             set_files = dict()
             for file in files:
                 file_frame = tk.Frame(remove_frame)
@@ -242,23 +241,22 @@ if __name__ == "__main__":
 
             remove_frame.pack()
 
-            button_frame = tk.Frame(remove_window)
+            button_frame = tk.Frame(self.remove_files_window)
             tk.Button(button_frame, text="Set", command=lambda:
-                      self.removeFiles(remove_window, parent_frame, option_menu, option_menu_var, menu,
-                                       file_menu, set_files)).pack(side="left", padx=30)
-            tk.Button(button_frame, text="Close", command=lambda:
-                      self.closeWindow(remove_window)).pack(side="left", padx=30)
+                      self.removeFiles(set_files)).pack(side="left", padx=30)
+            tk.Button(button_frame, text="Close", command=
+                      self.remove_files_window.closeWindow).pack(side="left", padx=30)
             button_frame.pack(fill="both", expand=1, pady=5)
 
-        def configureRemoveColumnsWindow(self, parent_frame, option_menu_var):
-            remove_window = tk.Toplevel(self)
-            remove_window.wm_title("Remove set columns")
+        def configureRemoveColumnsWindow(self):
+            self.remove_columns_window = tk.Toplevel(self)
+            self.remove_columns_window.wm_title("Remove set columns")
 
-            remove_frame = tk.LabelFrame(remove_window, text="Compared columns", borderwidth=2, relief="groove")
-            files = input_list[option_menu_var.get()]["file_names"]
+            remove_frame = tk.LabelFrame(self.remove_columns_window, text="Compared columns", borderwidth=2, relief="groove")
+            files = input_list[self.file_options_var.get()]["file_names"]
             set_file_columns = dict()
             for file in files:
-                columns = input_list[option_menu_var.get()]["set_columns"][file]
+                columns = input_list[self.file_options_var.get()]["set_columns"][file]
                 file_frame = tk.LabelFrame(remove_frame, text=file, borderwidth=2, relief="groove")
                 set_columns = dict()
                 for column in columns:
@@ -271,19 +269,18 @@ if __name__ == "__main__":
                 set_file_columns[file] = set_columns
                 file_frame.pack(pady=5)
 
-            button_frame = tk.Frame(remove_window)
+            button_frame = tk.Frame(self.remove_columns_window)
             tk.Button(button_frame, text="Set", command=lambda:
-                      self.removeColumns(remove_window, parent_frame, option_menu_var,
-                                      set_columns)).pack(side="left", padx=30)
-            tk.Button(button_frame, text="Close", command=lambda:
-                      self.closeWindow(remove_window)).pack(side="left", padx=30)
+                      self.removeColumns(set_columns)).pack(side="left", padx=30)
+            tk.Button(button_frame, text="Close", command=
+                      self.remove_columns_window.closeWindow).pack(side="left", padx=30)
             button_frame.pack(fill="both", expand=1, pady=5)
 
-        def configureSettings(self, option_menu_var):
-            settings_window = tk.Toplevel(self)
-            settings_window.wm_title("Analysis settings")
+        def configureSettings(self):
+            self.settings_window = tk.Toplevel(self)
+            self.settings_window.wm_title("Analysis settings")
 
-            general_settings_frame = tk.LabelFrame(settings_window, text="General settings", borderwidth=2,
+            general_settings_frame = tk.LabelFrame(self.settings_window, text="General settings", borderwidth=2,
                                                    relief="groove")
 
             period_frame = tk.Frame(general_settings_frame)
@@ -292,108 +289,102 @@ if __name__ == "__main__":
             tk.Label(period_frame, textvariable=label_text, height=2).pack(side="left", padx=5)
             period = tk.StringVar()
             ttk.OptionMenu(period_frame, period, *["Period", "Minimum", "Maximum", "Both"]).pack(side="left", padx=30)
-            period.set(input_list[option_menu_var.get()]["period"])
+            period.set(input_list[self.file_options_var.get()]["period"])
             period_frame.pack()
 
             point_size = self.buildLabelScale(general_settings_frame, "Point size\nof plot",
-                                             input_list[option_menu_var.get()]["pointsize"], 0, 20, 4)
+                                             input_list[self.file_options_var.get()]["pointsize"], 0, 20, 4)
             starting_point = self.buildLabelSpinbox(general_settings_frame, "Starting point\nof plot",
-                                                    input_list[option_menu_var.get()]["startingpoint"], 0.1, 3)
+                                                    input_list[self.file_options_var.get()]["startingpoint"], 0.1, 3)
             data_number = self.buildLabelScale(general_settings_frame, "Number of\nused data points",
-                                              input_list[option_menu_var.get()]["datanumber"], 0,
-                                              input_list[option_menu_var.get()]["data_per_measurement"], 4)
+                                              input_list[self.file_options_var.get()]["datanumber"], 0,
+                                              input_list[self.file_options_var.get()]["data_per_measurement"], 4)
             minute_point = self.buildLabelScale(general_settings_frame, "Data minute point",
-                                               input_list[option_menu_var.get()]["minutepoint"], -1,
-                                               input_list[option_menu_var.get()]["data_minutepoints"], 4)
+                                               input_list[self.file_options_var.get()]["minutepoint"], -1,
+                                               input_list[self.file_options_var.get()]["data_minutepoints"], 4)
 
             plot_color = tk.Button(general_settings_frame, text="Color of plot", command=lambda:
-                                   self.setPlotColor("Plot color", input_list[option_menu_var.get()]["color"])).pack()
+                                   self.setPlotColor("Plot color", input_list[self.file_options_var.get()]["color"])).pack()
             general_settings_frame.pack(fill="both", expand=1)
 
-            minimum_exclude = self.buildExcludeField(settings_window, "Minimum", " Exclude first day",
-                                                     input_list[option_menu_var.get()]["minimum"]["exclude_firstday"],
+            minimum_exclude = self.buildExcludeField(self.settings_window, "Minimum", " Exclude first day",
+                                                     input_list[self.file_options_var.get()]["minimum"]["exclude_firstday"],
                                                      " Exclude last day",
-                                                     input_list[option_menu_var.get()]["minimum"]["exclude_lastday"])
-            maximum_exclude = self.buildExcludeField(settings_window, "Maximum", " Exclude first day",
-                                                      input_list[option_menu_var.get()]["maximum"]["exclude_firstday"],
+                                                     input_list[self.file_options_var.get()]["minimum"]["exclude_lastday"])
+            maximum_exclude = self.buildExcludeField(self.settings_window, "Maximum", " Exclude first day",
+                                                      input_list[self.file_options_var.get()]["maximum"]["exclude_firstday"],
                                                       " Exclude last day",
-                                                      input_list[option_menu_var.get()]["maximum"]["exclude_lastday"])
+                                                      input_list[self.file_options_var.get()]["maximum"]["exclude_lastday"])
 
-            x_label_frame = tk.LabelFrame(settings_window, text="X-axis label", borderwidth=2, relief="groove")
+            x_label_frame = tk.LabelFrame(self.settings_window, text="X-axis label", borderwidth=2, relief="groove")
             x_label = tk.StringVar()
             tk.Radiobutton(x_label_frame, text="Days", variable=x_label, value="Days").pack(side="left", padx=50)
             tk.Radiobutton(x_label_frame, text="Hours", variable=x_label, value="Hours").pack(side="left", padx=50)
-            x_label.set(input_list[option_menu_var.get()]["xlabel"])
+            x_label.set(input_list[self.file_options_var.get()]["xlabel"])
             x_label_frame.pack(fill="both", expand=1, pady=5)
 
-            sg_frame = tk.LabelFrame(settings_window, text="Sg-Filter", borderwidth=2, relief="groove")
+            sg_frame = tk.LabelFrame(self.settings_window, text="Sg-Filter", borderwidth=2, relief="groove")
             sg_filter = tk.BooleanVar()
             tk.Checkbutton(sg_frame, text=" Turn filter on", var=sg_filter).pack(side="left", padx=20)
             sg_plot_color = tk.Button(sg_frame, text="Set color of SG-Plot", command=lambda:
                                       self.setPlotColor("SG-Plot color",
-                                      input_list[option_menu_var.get()]["sg_filter"]["color"])).pack(side="left")
+                                      input_list[self.file_options_var.get()]["sg_filter"]["color"])).pack(side="left")
             sg_frame.pack(fill="both", expand=1, pady=5)
 
-            button_frame = tk.Frame(settings_window)
+            button_frame = tk.Frame(self.settings_window)
             tk.Button(button_frame, text="Ok", command=lambda:
-                      self.setGeneralSettings(settings_window, option_menu_var, point_size, starting_point, data_number,
+                      self.settings_window.setGeneralSettings(self.file_options_var, point_size, starting_point, data_number,
                                               minute_point, period, plot_color, minimum_exclude, maximum_exclude, x_label,
                                               sg_filter, sg_plot_color)).pack(side="left", padx=30)
             tk.Button(button_frame, text="Advanced", command=lambda:
-                      self.configureAdvancedSettings(settings_window, option_menu_var)).pack(side="left", padx=30)
-            tk.Button(button_frame, text="Cancel", command=lambda:
-                      self.closeWindow(settings_window)).pack(side="left", padx=30)
+                      self.settings_window.configureAdvancedSettings(self.file_options_var)).pack(side="left", padx=30)
+            tk.Button(button_frame, text="Cancel", command=self.settings_window.closeWindow).pack(side="left", padx=30)
             button_frame.pack(fill="both", expand=1, pady=5)
 
-        def configureAdvancedSettings(self, parent_window, option_menu_var):
-            advanced_settings_window = tk.Toplevel(parent_window)
-            advanced_settings_window.wm_title("Advanced settings")
+        def configureAdvancedSettings(self, parent_window, self.file_options_var):
+            self.advanced_settings_window = tk.Toplevel(parent_window)
+            self.advanced_settings_window.wm_title("Advanced settings")
 
-            peak_valley_frame = tk.LabelFrame(advanced_settings_window, text="Peak-Valley settings", borderwidth=2,
+            peak_valley_frame = tk.LabelFrame(self.advanced_settings_window, text="Peak-Valley settings", borderwidth=2,
                                               relief="groove")
             peak_valley_points = self.buildLabelSpinbox(peak_valley_frame, "Peak-Valley\ndetection points",
-                                                        input_list[option_menu_var.get()]["pv_points"], 1, 3)
+                                                        input_list[self.file_options_var.get()]["pv_points"], 1, 3)
             peak_valley_percentage = self.buildLabelSpinbox(peak_valley_frame, "Peak-Valley\namplitude percentage",
-                                                            input_list[option_menu_var.get()]["pv_amp_per"], 0.1, 3)
+                                                            input_list[self.file_options_var.get()]["pv_amp_per"], 0.1, 3)
             peak_valley_frame.pack(fill="both", expand=1)
 
             sg_filter_frame = tk.LabelFrame(advanced_settings_window, text="Savitzky-Golay-Filter settings",
                                             borderwidth=2, relief="groove")
             sg_window_size = self.buildLabelSpinbox(sg_filter_frame, "SG-Filter window size",
-                                                    input_list[option_menu_var.get()]["sg_filter"]["window"], 1, 2)
+                                                    input_list[self.file_options_var.get()]["sg_filter"]["window"], 1, 2)
             sg_poly_order = self.buildLabelSpinbox(sg_filter_frame, "SG-Filter poly order",
-                                                   input_list[option_menu_var.get()]["sg_filter"]["poly"], 1, 2)
+                                                   input_list[self.file_options_var.get()]["sg_filter"]["poly"], 1, 2)
             sg_filter_frame.pack(fill="both", expand=1, pady=5)
 
-            button_frame = tk.Frame(advanced_settings_window)
+            button_frame = tk.Frame(self.advanced_settings_window)
             tk.Button(button_frame, text="Ok", command=lambda:
-                      self.setAdvancedSettings(advanced_settings_window, option_menu_var,
+                      self.setAdvancedSettings(self.file_options_var,
                       peak_valley_points, peak_valley_percentage,
                       sg_window_size, sg_poly_order)).pack(side="left", padx=70)
-            tk.Button(button_frame, text="Cancel", command=lambda:
-                      self.closeWindow(advanced_settings_window)).pack(side="left", padx=70)
+            tk.Button(button_frame, text="Cancel", command=self.advanced_settings_window.closeWindow).pack(side="left", padx=70)
             button_frame.pack(fill="both", expand=1, pady=5)
 
-        def setFiles(self, parent_frame, option_menu, option_menu_var, file_menu, set_files, name):
-            global input_list
-
-            if(name.get() and not name.get() in input_list):
-                file_list = ["Files"]
+        def setFiles(self, set_files, name):
+            if(name.get() and not name.get() in self.input_list):
+                file_list = ["Files"] + list(self.input_list.keys()) + [name.get()]
                 data_per_measurement = sys.maxsize
                 timepoint_indices = list()
                 data_minutepoints = sys.maxsize
-                for entry in input_list:
-                    file_list.append(entry)
-                    if(data_per_measurement < input_list[entry]["data_per_measurement"]):
-                        data_per_measurement = input_list[entry]["data_per_measurement"]
+                for entry in self.input_list:
+                    if(data_per_measurement < self.input_list[entry]["data_per_measurement"]):
+                        data_per_measurement = self.input_list[entry]["data_per_measurement"]
 
-                    if(len(timepoint_indices) < len(input_list[entry]["timepoint_indices"])):
-                        timepoint_indices = input_list[entry]["timepoint_indices"]
+                    if(len(timepoint_indices) < len(self.input_list[entry]["timepoint_indices"])):
+                        timepoint_indices = self.input_list[entry]["timepoint_indices"]
 
-                    if(data_minutepoints < input_list[entry]["data_minutepoints"]):
-                        data_minutepoints = input_list[entry]["data_minutepoints"]
+                    if(data_minutepoints < self.input_list[entry]["data_minutepoints"]):
+                        data_minutepoints = self.input_list[entry]["data_minutepoints"]
 
-                file_list.append(name.get())
                 true_files = list()
                 none_chosen = True
                 for file,val in set_files.items():
@@ -403,7 +394,7 @@ if __name__ == "__main__":
                         none_chosen = False
 
                 if(not none_chosen):
-                    input_list[name.get()] = {"path": list(), "output": None, "pointsize": 3, "startingpoint": 12,
+                    self.input_list[name.get()] = {"path": list(), "output": None, "pointsize": 3, "startingpoint": 12,
                                               "datanumber": 5, "minutepoint": -1, "period": "Both", "color": "#000000",
                                               "minimum": {"exclude_firstday": False, "exclude_lastday": True},
                                               "maximum": {"exclude_firstday": True, "exclude_lastday": False},
@@ -413,14 +404,12 @@ if __name__ == "__main__":
                                               "timepoint_indices": timepoint_indices,
                                               "data_minutepoints": data_minutepoints, "file_names": true_files,
                                               "set_columns": dict()}
-                    option_menu.set_menu(*file_list)
-                    option_menu_var.set(name.get())
-                    file_menu.entryconfig("Remove compared files", state="normal")
-                    self.showComparisons(parent_frame, name, 2)
+                    self.file_options.set_menu(*file_list)
+                    self.file_options_var.set(name.get())
+                    self.file.entryconfig("Remove compared files", state="normal")
+                    self.info_frame.showComparisons()
 
-        def setColumns(self, parent_frame, option_menu_var, set_column_data):
-            global input_list
-
+        def setColumns(self, set_column_data):
             chosen_list = list()
             for file,data in set_column_data.items():
                 true_columns = list()
@@ -433,54 +422,46 @@ if __name__ == "__main__":
 
                 chosen_list.append(none_chosen)
                 if(not none_chosen):
-                    if(not file in input_list[option_menu_var.get()]["set_columns"]):
-                        input_list[option_menu_var.get()]["set_columns"][file] = list()
+                    if(not file in input_list[self.file_options_var.get()]["set_columns"]):
+                        input_list[self.file_options_var.get()]["set_columns"][file] = list()
 
-                    input_list[option_menu_var.get()]["set_columns"][file].append(" - ".join(true_columns))
+                    input_list[self.file_options_var.get()]["set_columns"][file].append(" - ".join(true_columns))
 
             if(len(chosen_list) and not all(chosen_list)):
-                self.showComparisons(parent_frame, option_menu_var, 2)
+                self.showComparisons()
 
-        def removeFiles(self, window, parent_frame, option_menu, option_menu_var, menu, file_menu, files):
-            global input_list
-
+        def removeFiles(self, files):
             empty = False
             for file,val in files.items():
                 if(val.get()):
-                    file_list = input_list[option_menu_var.get()]["file_names"]
+                    file_list = self.input_list[self.file_options_var.get()]["file_names"]
                     file_list.remove(file)
-                    input_list["All"]["file_names"].remove(file)
+                    self.input_list["All"]["file_names"].remove(file)
                     if(not len(file_list)):
-                        input_list.pop(option_menu_var.get(), None)
-                        file_list = ["Files"]
-                        for entry in input_list:
-                            file_list.append(entry)
-
-                        option_menu.set_menu(*file_list)
-                        option_menu_var.set("All")
-                        file_menu.entryconfig("Remove compared files", state="disabled")
+                        self.input_list.pop(self.file_options_var.get(), None)
+                        file_list = ["Files"] + list(self.input_list.keys())
+                        self.file_options.set_menu(*file_list)
+                        self.file_options_var.set("All")
+                        self.file.entryconfig("Remove compared files", state="disabled")
                         empty = True
 
-            if(not len(input_list["All"]["file_names"])):
-                file_menu.entryconfig("Compare files", state="disabled")
-                file_menu.entryconfig("Show compared files", state="disabled")
-                menu.entryconfig("PisA analysis", state="disabled")
+            if(not len(self.input_list["All"]["file_names"])):
+                self.file.entryconfig("Compare files", state="disabled")
+                self.file.entryconfig("Show compared files", state="disabled")
+                self.menu.entryconfig("PisA analysis", state="disabled")
 
-            if(not empty):
-                self.showComparisons(parent_frame, option_menu_var, 2)
-            else:
-                option_menu_var_all = tk.StringVar()
-                option_menu_var_all.set("All")
-                self.showComparisons(parent_frame, option_menu_var_all, 2)
+            if(empty):
+                self.file_options_var.set("All")
 
-            self.closeWindow(window)
+            self.info_frame.showComparisons()
+            self.closeWindow()
 
-        def removeColumns(self, window, parent_frame, option_menu_var, columns):
+        def removeColumns(self, window, parent_frame, self.file_options_var, columns):
             global input_list
 
             for file,data in columns.items():
                 empty = False
-                column_list = input_list[option_menu_var.get()]["set_columns"]
+                column_list = input_list[self.file_options_var.get()]["set_columns"]
                 for col,var in data.items():
                     if(val.get()):
                         column_list[file].remove(col)
@@ -489,7 +470,7 @@ if __name__ == "__main__":
                             empty =True
 
             if(not empty):
-                self.showComparisons(parent_frame, option_menu_var, 2)
+                self.showComparisons(parent_frame, self.file_options_var, 2)
             else:
                 for child in parent_frame.winfo_children():
                     child.destroy()
@@ -497,25 +478,25 @@ if __name__ == "__main__":
             self.closeWindow(window)
 
 
-        def showComparisons(self, parent_frame, option_menu_var, height):
-            for child in parent_frame.winfo_children():
-                child.destroy()
+        def showComparisons(self):
+            for child in self.info_frame.winfo_children():
+                child.pack_forget()
 
-            frame = tk.Frame(parent_frame)
+            frame = tk.Frame(self.info_frame)
             label_frame = tk.Frame(frame)
             label_text = tk.StringVar()
             label_text.set("Compared files:")
-            tk.Label(label_frame, textvariable=label_text, height=height).pack(side="left")
+            tk.Label(label_frame, textvariable=label_text, height=2).pack(side="left")
             label_frame.pack(fill="both", expand=1)
             list_frame = tk.Frame(frame)
-            files = input_list[option_menu_var.get()]["file_names"]
+            files = self.input_list[self.file_options_var.get()]["file_names"]
             for file in files:
                 file_frame = tk.Frame(list_frame)
                 file_text = tk.StringVar()
                 file_text.set("  " + file)
                 tk.Label(file_frame, textvariable=file_text).pack(side="left")
                 file_frame.pack(fill="both", expand=1)
-                columns = input_list[option_menu_var.get()]["set_columns"]
+                columns = self.input_list[self.file_options_var.get()]["set_columns"]
                 if(file in columns):
                     column_label_frame = tk.Frame(list_frame)
                     label_column_text = tk.StringVar()
@@ -533,73 +514,70 @@ if __name__ == "__main__":
             frame.pack(side="left")
 
 
-        def setGeneralSettings(self, window, option_menu_var, point_size, starting_point, data_number, minute_point,
+        def setGeneralSettings(self, window, self.file_options_var, point_size, starting_point, data_number, minute_point,
                                period, plot_color, minimum_exclude, maximum_exclude, x_label, sg_filter, sg_plot_color):
             global input_list
 
-            input_list[option_menu_var.get()]["pointsize"] = point_size.get()
-            input_list[option_menu_var.get()]["startingpoint"] = starting_point.get()
-            input_list[option_menu_var.get()]["datanumber"] = data_number.get()
-            input_list[option_menu_var.get()]["minutepoint"] = minute_point.get()
-            input_list[option_menu_var.get()]["period"] = period.get()
-            input_list[option_menu_var.get()]["color"] = plot_color
-            input_list[option_menu_var.get()]["minimum"]["exclude_firstday"] = minimum_exclude[0].get()
-            input_list[option_menu_var.get()]["minimum"]["exclude_lastday"] = minimum_exclude[1].get()
-            input_list[option_menu_var.get()]["maximum"]["exclude_lastday"] = maximum_exclude[0].get()
-            input_list[option_menu_var.get()]["maximum"]["exclude_lastday"] = maximum_exclude[1].get()
-            input_list[option_menu_var.get()]["xlabel"] = x_label.get()
-            input_list[option_menu_var.get()]["sg_filter"]["on"] = sg_filter.get()
-            input_list[option_menu_var.get()]["sg_filter"]["color"] = sg_plot_color
+            input_list[self.file_options_var.get()]["pointsize"] = point_size.get()
+            input_list[self.file_options_var.get()]["startingpoint"] = starting_point.get()
+            input_list[self.file_options_var.get()]["datanumber"] = data_number.get()
+            input_list[self.file_options_var.get()]["minutepoint"] = minute_point.get()
+            input_list[self.file_options_var.get()]["period"] = period.get()
+            input_list[self.file_options_var.get()]["color"] = plot_color
+            input_list[self.file_options_var.get()]["minimum"]["exclude_firstday"] = minimum_exclude[0].get()
+            input_list[self.file_options_var.get()]["minimum"]["exclude_lastday"] = minimum_exclude[1].get()
+            input_list[self.file_options_var.get()]["maximum"]["exclude_lastday"] = maximum_exclude[0].get()
+            input_list[self.file_options_var.get()]["maximum"]["exclude_lastday"] = maximum_exclude[1].get()
+            input_list[self.file_options_var.get()]["xlabel"] = x_label.get()
+            input_list[self.file_options_var.get()]["sg_filter"]["on"] = sg_filter.get()
+            input_list[self.file_options_var.get()]["sg_filter"]["color"] = sg_plot_color
             window.destroy()
 
         def setPlotColor(self, text, value):
             plot_color = tkcc.askcolor(initialcolor=value, title=text)[-1]
             return plot_color
 
-        def setAdvancedSettings(self, window, option_menu_var, peak_valley_points, peak_valley_percentage,
-                                sg_window_size, sg_poly_order):
-            global input_list
-
-            input_list[option_menu_var.get()]["pv_points"] = peak_valley_points.get()
-            input_list[option_menu_var.get()]["pv_amp_per"] = peak_valley_percentage.get()
-            input_list[option_menu_var.get()]["sg_filter"]["window"] = sg_window_size.get()
-            input_list[option_menu_var.get()]["sg_filter"]["poly"] = sg_poly_order.get()
-            window.destroy()
+        def setAdvancedSettings(self, peak_valley_points, peak_valley_percentage, sg_window_size, sg_poly_order):
+            self.input_list[self.file_options_var.get()]["pv_points"] = peak_valley_points.get()
+            self.input_list[self.file_options_var.get()]["pv_amp_per"] = peak_valley_percentage.get()
+            self.input_list[self.file_options_var.get()]["sg_filter"]["window"] = sg_window_size.get()
+            self.input_list[self.file_options_var.get()]["sg_filter"]["poly"] = sg_poly_order.get()
+            self.advanced_settings_window.destroy()
 
 
-        def closeWindow(self, window):
-            window.destroy()
+        def closeWindow(self):
+            self.destroy()
 
         def closeApplication(self):
             exit()
 
-        def enableMenus(self, menu, pisa_menu):
-            menu.entryconfig("Files", state="normal")
-            pisa_menu.entryconfig("Start analysis", state="normal")
-            pisa_menu.entryconfig("Cancel analysis", state="disabled")
-            pisa_menu.entryconfig("Compare columns", state="normal")
-            pisa_menu.entryconfig("Remove compared columns", state="normal")
-            pisa_menu.entryconfig("Show compared columns", state="normal")
-            pisa_menu.entryconfig("Settings", state="normal")
-            menu.entryconfig("Exit", state="normal")
+        def enableMenus(self):
+            self.menu.entryconfig("Files", state="normal")
+            self.pisa.entryconfig("Start analysis", state="normal")
+            self.pisa.entryconfig("Cancel analysis", state="disabled")
+            self.pisa.entryconfig("Compare columns", state="normal")
+            self.pisa.entryconfig("Remove compared columns", state="normal")
+            self.pisa.entryconfig("Show compared columns", state="normal")
+            self.pisa.entryconfig("Settings", state="normal")
+            self.menu.entryconfig("Exit", state="normal")
 
-        def disableMenus(self, menu, pisa_menu):
+        def disableMenus(self, menu, self.pisa):
             menu.entryconfig("Files", state="disabled")
-            pisa_menu.entryconfig("Start analysis", state="disabled")
-            pisa_menu.entryconfig("Cancel analysis", state="normal")
-            pisa_menu.entryconfig("Compare columns", state="disabled")
-            pisa_menu.entryconfig("Remove compared columns", state="disabled")
-            pisa_menu.entryconfig("Show compared columns", state="disabled")
-            pisa_menu.entryconfig("Settings", state="disabled")
+            self.pisa.entryconfig("Start analysis", state="disabled")
+            self.pisa.entryconfig("Cancel analysis", state="normal")
+            self.pisa.entryconfig("Compare columns", state="disabled")
+            self.pisa.entryconfig("Remove compared columns", state="disabled")
+            self.pisa.entryconfig("Show compared columns", state="disabled")
+            self.pisa.entryconfig("Settings", state="disabled")
             menu.entryconfig("Exit", state="disabled")
 
-        def checkFileComparing(self, parent_frame, file_menu, option_menu_var):
-            if(option_menu_var.get() == "All"):
-                file_menu.entryconfig("Remove compared files", state="disabled")
+        def checkFileComparing(self):
+            if(self.file_options_var.get() == "All"):
+                self.file.entryconfig("Remove compared files", state="disabled")
             else:
-                file_menu.entryconfig("Remove compared files", state="normal")
+                self.file.entryconfig("Remove compared files", state="normal")
 
-            self.showComparisons(parent_frame, option_menu_var, 2)
+            self.showComparisons()
 
         def buildLabelSpinbox(self, parent_frame, text, value, increment, height):
             frame = tk.Frame(parent_frame)
@@ -612,11 +590,11 @@ if __name__ == "__main__":
             frame.pack()
             return label_spinbox
 
-        def buildLabelScale(self, parent_frame, text, value, min, max, height):
+        def buildLabelScale(self, text, value, min, max):
             frame = tk.Frame(parent_frame)
             label_text = tk.StringVar()
             label_text.set(text)
-            tk.Label(frame, textvariable=label_text, height=height).pack(side="left")
+            tk.Label(frame, textvariable=label_text, height=4).pack(side="left")
             label_scale = tk.Scale(frame, from_=min, to=max, orient="horizontal", relief="groove")
             label_scale.set(value)
             label_scale.pack(side="left")
@@ -633,6 +611,9 @@ if __name__ == "__main__":
             tk.Checkbutton(frame, text=second_label, var=second_var).pack(side="left")
             frame.pack(fill="both", expand=1, pady=5)
             return [first_var, second_var]
+
+        def configureScrollbar(self, event):
+            self.canvas.configure(scrollregion=self.canvas.bbox("all"))
 
 
     root = tk.Tk()
