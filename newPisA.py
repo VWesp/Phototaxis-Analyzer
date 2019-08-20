@@ -42,7 +42,7 @@ if __name__ == "__main__":
             self.file_options_var = tk.StringVar()
             self.file_options_var.set("Files")
             self.file_options = ttk.OptionMenu(self.file_options_frame, self.file_options_var, *["Files"],
-                           command=lambda _: self.showComparisons())
+                                               command=lambda _: self.checkComparedColumns())
             self.file_options.pack()
             self.file_options.configure(state="disabled")
             self.file_options_frame.pack()
@@ -246,7 +246,7 @@ if __name__ == "__main__":
 
             remove_frame = tk.LabelFrame(self.remove_columns_window, text="Compared columns",
                                          borderwidth=2, relief="groove")
-            files = self.input_list[self.file_options_var.get()]["file_names"]
+            files = list(self.input_list[self.file_options_var.get()]["set_columns"].keys())
             set_file_columns = dict()
             for file in files:
                 columns = self.input_list[self.file_options_var.get()]["set_columns"][file]
@@ -255,16 +255,18 @@ if __name__ == "__main__":
                 for column in columns:
                     column_frame = tk.Frame(file_frame)
                     column_var = tk.BooleanVar()
-                    tk.Checkbutton(remove_frame, text=" "+column, var=column_var).pack(side="left")
+                    tk.Checkbutton(column_frame, text=" "+column, var=column_var).pack(side="left")
                     set_columns[column] = column_var
-                    column_frame.pack()
+                    column_frame.pack(fill="both", expand=1)
 
                 set_file_columns[file] = set_columns
                 file_frame.pack(pady=5)
 
+            remove_frame.pack()
+
             button_frame = tk.Frame(self.remove_columns_window)
             tk.Button(button_frame, text="Set", command=lambda:
-                      self.removeColumns(set_columns)).pack(side="left", padx=30)
+                      self.removeColumns(set_file_columns)).pack(side="left", padx=30)
             tk.Button(button_frame, text="Close", command=lambda:
                       self.closeWindow(self.remove_columns_window)).pack(side="left", padx=30)
             button_frame.pack(fill="both", expand=1, pady=5)
@@ -371,7 +373,7 @@ if __name__ == "__main__":
             button_frame.pack(fill="both", expand=1, pady=5)
 
         def setFiles(self, set_files, name):
-            if(name.get() and not name.get() in self.input_list):
+            if(len(list(set_files.keys())) and name.get() and not name.get() in self.input_list):
                 file_list = ["Files"] + list(self.input_list.keys()) + [name.get()]
                 data_per_measurement = sys.maxsize
                 timepoint_indices = list()
@@ -412,25 +414,27 @@ if __name__ == "__main__":
                     self.showComparisons()
 
         def setColumns(self, set_column_data):
-            chosen_list = list()
-            for file,data in set_column_data.items():
-                true_columns = list()
-                none_chosen = True
-                for col,val in data.items():
-                    if(val.get()):
-                        true_columns.append(col)
-                        val.set(False)
-                        none_chosen = False
+            if(len(list(set_column_data.keys()))):
+                chosen_list = list()
+                for file,data in set_column_data.items():
+                    true_columns = list()
+                    none_chosen = True
+                    for col,val in data.items():
+                        if(val.get()):
+                            true_columns.append(col)
+                            val.set(False)
+                            none_chosen = False
 
-                chosen_list.append(none_chosen)
-                if(not none_chosen):
-                    if(not file in self.input_list[self.file_options_var.get()]["set_columns"]):
-                        self.input_list[self.file_options_var.get()]["set_columns"][file] = list()
+                    chosen_list.append(none_chosen)
+                    if(not none_chosen):
+                        if(not file in self.input_list[self.file_options_var.get()]["set_columns"]):
+                            self.input_list[self.file_options_var.get()]["set_columns"][file] = list()
 
-                    self.input_list[self.file_options_var.get()]["set_columns"][file].append(" - ".join(true_columns))
+                        self.input_list[self.file_options_var.get()]["set_columns"][file].append(" - ".join(true_columns))
 
-            if(len(chosen_list) and not all(chosen_list)):
-                self.showComparisons()
+                if(len(chosen_list) and not all(chosen_list)):
+                    self.pisa.entryconfig("Remove compared columns", state="normal")
+                    self.showComparisons()
 
         def removeFiles(self, files):
             if(len(list(files.keys()))):
@@ -471,24 +475,23 @@ if __name__ == "__main__":
 
         def removeColumns(self, columns):
             if(len(list(columns.keys()))):
+                deleted_list = list()
                 for file,data in columns.items():
-                    empty = False
+                    deleted = False
                     column_list = self.input_list[self.file_options_var.get()]["set_columns"]
-                    for col,var in data.items():
+                    for col,val in data.items():
                         if(val.get()):
                             column_list[file].remove(col)
                             if(not len(column_list[file])):
                                 column_list.pop(file, None)
-                                empty =True
+                                deleted =True
 
-                if(not empty):
-                    self.showComparisons()
-                else:
-                    for child in self.info_frame.winfo_children():
-                        child.destroy()
+                    deleted_list.append(deleted)
 
+                self.showComparisons()
                 self.closeWindow(self.remove_columns_window)
-
+                if(all(deleted_list)):
+                    self.pisa.entryconfig("Remove compared columns", state="disabled")
 
         def showComparisons(self):
             for child in self.info_frame.winfo_children():
@@ -562,6 +565,8 @@ if __name__ == "__main__":
                 self.pisa.entryconfig("Remove compared columns", state="normal")
             else:
                 self.pisa.entryconfig("Remove compared columns", state="disabled")
+
+            self.showComparisons()
 
         def closeWindow(self, window):
             window.destroy()
