@@ -23,7 +23,8 @@ if __name__ == "__main__":
                                       "xlabel": "Days","sg_filter": {"on": False, "window": 11, "poly": 3,
                                       "color": "#800000"},"pv_points": 1, "pv_amp_per": 3,
                                       "data_per_measurement": sys.maxsize,"timepoint_indices": list(),
-                                      "data_minutepoints": sys.maxsize, "file_names": [],"set_columns": dict()}
+                                      "data_minutepoints": sys.maxsize, "file_names": [],"set_columns": dict(),
+                                      "set_settings": False}
             tk.Frame.__init__(self, master)
             self.master = master
             self.initWindow()
@@ -101,13 +102,15 @@ if __name__ == "__main__":
                 if(not file_name in file_options_list):
                     self.file.entryconfig("Remove compared files", state="normal")
                     self.input_list["All"]["file_names"].append(file_name)
-                    self.input_list[file_name] = {"path": file, "output": os.path.dirname(file) + "/", "pointsize": 3,
-                                             "startingpoint": 12, "datanumber": 5, "minutepoint": -1, "period": "Both",
-                                             "color": "#000000", "minimum": {"exclude_firstday": False,
-                                             "exclude_lastday": True}, "maximum": {"exclude_firstday": True,
-                                             "exclude_lastday": False}, "xlabel": "Days", "sg_filter": {"on": False,
-                                             "window": 11, "poly": 3, "color": "#800000"}, "pv_points": 1,
-                                             "pv_amp_per": 3, "set_columns": dict(), "file_names": [file_name]}
+                    self.input_list[file_name] = {"path": file, "output": os.path.dirname(file) + "/",
+                                                  "pointsize": 3, "startingpoint": 12, "datanumber": 5,
+                                                  "minutepoint": -1, "period": "Both", "color": "#000000",
+                                                  "minimum": {"exclude_firstday": False, "exclude_lastday": True},
+                                                  "maximum": {"exclude_firstday": True, "exclude_lastday": False},
+                                                  "xlabel": "Days", "sg_filter": {"on": False, "window": 11, "poly": 3,
+                                                  "color": "#800000"}, "pv_points": 1, "pv_amp_per": 3,
+                                                  "set_columns": dict(), "file_names": [file_name],
+                                                  "set_settings": False}
                     file_options_list.append(file_name)
                     self.file_options.set_menu(*file_options_list)
                     self.file_options_var.set(file_name)
@@ -275,8 +278,8 @@ if __name__ == "__main__":
             self.settings_window = tk.Toplevel(self)
             self.settings_window.wm_title("Analysis settings")
 
-            self.general_settings_frame = tk.LabelFrame(self.settings_window, text="General settings", borderwidth=2,
-                                                   relief="groove")
+            self.general_settings_frame = tk.LabelFrame(self.settings_window, text="General settings",
+                                                        borderwidth=2, relief="groove")
 
             period_frame = tk.Frame(self.general_settings_frame)
             label_text = tk.StringVar()
@@ -329,11 +332,21 @@ if __name__ == "__main__":
                                       self.input_list[self.file_options_var.get()]["sg_filter"]["color"])).pack(side="left")
             sg_frame.pack(fill="both", expand=1, pady=5)
 
+            set_settings = tk.BooleanVar()
+            set_settings.set(self.input_list[self.file_options_var.get()]["set_settings"])
+            if(not self.file_options_var.get() in self.input_list["All"]["file_names"]):
+                set_settings_frame = tk.LabelFrame(self.settings_window, text="Group settings", borderwidth=2,
+                                                   relief="groove")
+                tk.Checkbutton(set_settings_frame, text=" Set settings for all files in the group",
+                                              var=set_settings).pack(side="left", padx=20)
+                set_settings_frame.pack(fill="both", expand=1, pady=5)
+
             button_frame = tk.Frame(self.settings_window)
             tk.Button(button_frame, text="Ok", command=lambda:
                       self.setGeneralSettings(point_size, starting_point, data_number,
                                               minute_point, period, plot_color, minimum_exclude, maximum_exclude,
-                                              x_label, sg_filter, sg_plot_color)).pack(side="left", padx=30)
+                                              x_label, sg_filter, sg_plot_color,
+                                              set_settings)).pack(side="left", padx=30)
             tk.Button(button_frame, text="Advanced",
                       command=self.configureAdvancedSettings).pack(side="left", padx=30)
             tk.Button(button_frame, text="Cancel",
@@ -373,7 +386,7 @@ if __name__ == "__main__":
             button_frame.pack(fill="both", expand=1, pady=5)
 
         def setFiles(self, set_files, name):
-            if(len(list(set_files.keys())) and name.get() and not name.get() in self.input_list):
+            if(len(set_files) and name.get() and not name.get() in self.input_list):
                 file_list = ["Files"] + list(self.input_list.keys()) + [name.get()]
                 data_per_measurement = sys.maxsize
                 timepoint_indices = list()
@@ -407,14 +420,15 @@ if __name__ == "__main__":
                                                    "data_per_measurement": data_per_measurement,
                                                    "timepoint_indices": timepoint_indices,
                                                    "data_minutepoints": data_minutepoints,
-                                                   "file_names": true_files,"set_columns": dict()}
+                                                   "file_names": true_files,"set_columns": dict(),
+                                                   "set_settings": False}
                     self.file_options.set_menu(*file_list)
                     self.file_options_var.set(name.get())
                     self.file.entryconfig("Remove compared files", state="normal")
                     self.showComparisons()
 
         def setColumns(self, set_column_data):
-            if(len(list(set_column_data.keys()))):
+            if(len(set_column_data)):
                 chosen_list = list()
                 for file,data in set_column_data.items():
                     true_columns = list()
@@ -437,14 +451,30 @@ if __name__ == "__main__":
                     self.showComparisons()
 
         def removeFiles(self, files):
-            if(len(list(files.keys()))):
+            if(len(files)):
                 for file,val in files.items():
                     if(val.get()):
                         self.input_list[self.file_options_var.get()]["file_names"].remove(file)
-                        if(self.file_options_var.get() in self.input_list["All"]["file_names"]):
-                            self.input_list["All"]["file_names"].remove(file)
-                        elif(self.file_options_var.get() == "All"):
-                            self.input_list.pop(file, None)
+                        if(not self.file_options_var.get() in self.input_list["All"]["file_names"]
+                           and self.file_options_var.get() != "All"):
+                            self.input_list[self.file_options_var.get()]["set_columns"].pop(file, None)
+                        else:
+                            if(self.file_options_var.get() == "All"):
+                                self.input_list.pop(file, None)
+                            elif(self.file_options_var.get() in self.input_list["All"]["file_names"]):
+                                self.input_list["All"]["file_names"].remove(file)
+                                if(file in self.input_list["All"]["set_columns"]):
+                                    self.input_list["All"]["set_columns"].pop(file, None)
+
+                            for entry in reversed(list(self.input_list.keys())):
+                                if(not entry in self.input_list["All"]["file_names"]
+                                   and file in self.input_list[entry]["file_names"]):
+                                    self.input_list[entry]["file_names"].remove(file)
+                                    if(file in self.input_list[entry]["set_columns"]):
+                                        self.input_list[entry]["set_columns"].pop(file, None)
+
+                                    if(not len(self.input_list[entry]["file_names"])):
+                                        self.input_list.pop(entry, None)
 
                 all_deleted = False
                 if(not len(self.input_list[self.file_options_var.get()]["file_names"])):
@@ -462,19 +492,18 @@ if __name__ == "__main__":
                         all_deleted = True
                         for child in self.info_frame.winfo_children():
                             child.pack_forget()
-
                 elif(self.file_options_var.get() == "All"):
-                    file_list = ["Files", "All"] + self.input_list["All"]["file_names"]
+                    file_list = ["Files"] + list(self.input_list.keys())
                     self.file_options.set_menu(*file_list)
                     self.file_options_var.set("All")
 
                 if(not all_deleted):
-                    self.showComparisons()
+                    self.checkComparedColumns()
 
                 self.closeWindow(self.remove_files_window)
 
         def removeColumns(self, columns):
-            if(len(list(columns.keys()))):
+            if(len(columns)):
                 deleted_list = list()
                 for file,data in columns.items():
                     deleted = False
@@ -531,9 +560,8 @@ if __name__ == "__main__":
 
         def setGeneralSettings(self, point_size, starting_point, data_number, minute_point,
                                period, plot_color, minimum_exclude, maximum_exclude, x_label, sg_filter,
-                               sg_plot_color):
+                               sg_plot_color, set_settings):
             global input_list
-
             self.input_list[self.file_options_var.get()]["pointsize"] = point_size.get()
             self.input_list[self.file_options_var.get()]["startingpoint"] = starting_point.get()
             self.input_list[self.file_options_var.get()]["datanumber"] = data_number.get()
@@ -547,6 +575,7 @@ if __name__ == "__main__":
             self.input_list[self.file_options_var.get()]["xlabel"] = x_label.get()
             self.input_list[self.file_options_var.get()]["sg_filter"]["on"] = sg_filter.get()
             self.input_list[self.file_options_var.get()]["sg_filter"]["color"] = sg_plot_color
+            self.input_list[self.file_options_var.get()]["set_settings"] = set_settings.get()
             self.settings_window.destroy()
 
         def setPlotColor(self, text, value):
