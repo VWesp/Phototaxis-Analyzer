@@ -11,6 +11,8 @@ if __name__ == "__main__":
     import numpy as np
     import phototaxisPlotter
     from functools import partial
+    import time
+
 
     class Application(tk.Frame):
 
@@ -27,6 +29,9 @@ if __name__ == "__main__":
                                       "set_settings": False}
             tk.Frame.__init__(self, master)
             self.master = master
+            self.manager = mp.Manager()
+            self.progress = self.manager.Value("i", 0)
+            self.lock = self.manager.Lock()
             self.initWindow()
 
         def initWindow(self):
@@ -71,8 +76,7 @@ if __name__ == "__main__":
             self.file.entryconfig("Remove compared files", state="disabled")
             self.menu.add_cascade(label="Files", menu=self.file)
             self.pisa = tk.Menu(self.menu, tearoff=0)
-            self.pisa.add_command(label="Start analysis", command=lambda:
-                             self.startPhotoaxisAnalysis(self.file_options_var, self.menu, self.pisa, self.progress))
+            self.pisa.add_command(label="Start analysis", command=self.startPhotoaxisAnalysis)
             self.pisa.add_command(label="Cancel analysis")
             self.pisa.add_separator()
             self.pisa.add_command(label="Compare columns", command=self.configureColumnWindow)
@@ -142,18 +146,22 @@ if __name__ == "__main__":
                 self.showComparisons()
 
         def startPhotoaxisAnalysis(self):
-            self.disableMenus(self.menu, self.pisa)
+            self.disableMenus()
+            self.progress.value = 0
             files = self.input_list[self.file_options_var.get()]["file_names"]
+            overall_running_time = 0
             for file in files:
-                columns = list(self.input_list[file]["data"])[2:]
-                pool = mp.Pool(processes=mp.cpu_count())
-                pool_map = partial(func, input_list)
-                pdf_single_pages = pool.map_async(pool_map, columns)
-                pool.close()
+                
 
-                pool.join()
+            pool = mp.Pool(processes=mp.cpu_count())
+            pool_map = partial(func, self.input_list)
+            plot_pages = pool.map_async(pool_map, files)
+            pool.close()
+            while(progress.value != 100):
+                self.update()
 
-            self.enableMenus(menu, self.pisa)
+            pool.join()
+            self.enableMenus()
 
         def configureFilesWindow(self):
             self.files_window = tk.Toplevel(self)
@@ -612,7 +620,7 @@ if __name__ == "__main__":
             self.pisa.entryconfig("Settings", state="normal")
             self.menu.entryconfig("Exit", state="normal")
 
-        def disableMenus(self, menu):
+        def disableMenus(self):
             menu.entryconfig("Files", state="disabled")
             self.pisa.entryconfig("Start analysis", state="disabled")
             self.pisa.entryconfig("Cancel analysis", state="normal")
