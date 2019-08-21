@@ -36,8 +36,8 @@ if __name__ == "__main__":
 
         def initWindow(self):
             self.progress_frame = tk.LabelFrame(self, text="Analysis progress", borderwidth=2, relief="groove")
-            self.progress = tk.DoubleVar()
-            ttk.Progressbar(self.progress_frame, orient="horizontal", mode="determinate", variable=self.progress,
+            self.progressbar = tk.DoubleVar()
+            ttk.Progressbar(self.progress_frame, orient="horizontal", mode="determinate", variable=self.progressbar,
                             length=380).pack()
             self.progress_frame.pack()
 
@@ -149,16 +149,22 @@ if __name__ == "__main__":
             self.disableMenus()
             self.progress.value = 0
             files = self.input_list[self.file_options_var.get()]["file_names"]
-            overall_running_time = 0
+            overall_columns = 0
             for file in files:
-                
+                overall_columns += len(list(self.input_list[file]["data"])[2:])
 
-            pool = mp.Pool(processes=mp.cpu_count())
-            pool_map = partial(func, self.input_list)
-            plot_pages = pool.map_async(pool_map, files)
+            progress_per_step = 100/overall_columns
+            threads = mp.cpu_count() if len(files) > mp.cpu_count() else len(files)
+            pool = mp.Pool(processes=threads)
+            pool_map = partial(phototaxisPlotter.plotData, input_list=self.input_list, progress=self.progress,
+                               progress_per_step=progress_per_step, lock=self.lock)
+            pdfs = pool.map_async(pool_map, files)
             pool.close()
-            while(progress.value != 100):
+            while(self.progress.value != 100):
+                self.progressbar.set(self.progress.value)
                 self.update()
+
+            self.progressbar.set(self.progress.value)
 
             pool.join()
             self.enableMenus()
@@ -310,9 +316,8 @@ if __name__ == "__main__":
                                                 self.input_list[self.file_options_var.get()]["minutepoint"], -1,
                                                 self.input_list[self.file_options_var.get()]["data_minutepoints"])
 
-            plot_color = tk.Button(self.general_settings_frame, text="Color of plot", command=lambda:
-                                   self.setPlotColor("Plot color",
-                                   self.input_list[self.file_options_var.get()]["color"])).pack()
+            tk.Button(self.general_settings_frame, text="Color of plot", command=lambda:
+                      self.setPlotColor(False)).pack()
             self.general_settings_frame.pack(fill="both", expand=1)
 
             minimum_exclude = self.buildExcludeField(self.settings_window, "Minimum", " Exclude first day",
@@ -336,8 +341,7 @@ if __name__ == "__main__":
             sg_filter.set(self.input_list[self.file_options_var.get()]["sg_filter"]["on"])
             tk.Checkbutton(sg_frame, text=" Turn filter on", var=sg_filter).pack(side="left", padx=20)
             sg_plot_color = tk.Button(sg_frame, text="Set color of SG-Plot", command=lambda:
-                                      self.setPlotColor("SG-Plot color",
-                                      self.input_list[self.file_options_var.get()]["sg_filter"]["color"])).pack(side="left")
+                                      self.setPlotColor(True)).pack(side="left")
             sg_frame.pack(fill="both", expand=1, pady=5)
 
             set_settings = tk.BooleanVar()
@@ -351,9 +355,8 @@ if __name__ == "__main__":
 
             button_frame = tk.Frame(self.settings_window)
             tk.Button(button_frame, text="Ok", command=lambda:
-                      self.setGeneralSettings(point_size, starting_point, data_number,
-                                              minute_point, period, plot_color, minimum_exclude, maximum_exclude,
-                                              x_label, sg_filter, sg_plot_color,
+                      self.setGeneralSettings(point_size, starting_point, data_number, minute_point,
+                                              period, minimum_exclude, maximum_exclude, x_label, sg_filter,
                                               set_settings)).pack(side="left", padx=30)
             tk.Button(button_frame, text="Advanced",
                       command=self.configureAdvancedSettings).pack(side="left", padx=30)
@@ -567,28 +570,38 @@ if __name__ == "__main__":
 
 
         def setGeneralSettings(self, point_size, starting_point, data_number, minute_point,
-                               period, plot_color, minimum_exclude, maximum_exclude, x_label, sg_filter,
-                               sg_plot_color, set_settings):
+                               period, minimum_exclude, maximum_exclude, x_label, sg_filter,
+                               set_settings):
             global input_list
             self.input_list[self.file_options_var.get()]["pointsize"] = point_size.get()
             self.input_list[self.file_options_var.get()]["startingpoint"] = starting_point.get()
             self.input_list[self.file_options_var.get()]["datanumber"] = data_number.get()
             self.input_list[self.file_options_var.get()]["minutepoint"] = minute_point.get()
             self.input_list[self.file_options_var.get()]["period"] = period.get()
-            self.input_list[self.file_options_var.get()]["color"] = plot_color
             self.input_list[self.file_options_var.get()]["minimum"]["exclude_firstday"] = minimum_exclude[0].get()
             self.input_list[self.file_options_var.get()]["minimum"]["exclude_lastday"] = minimum_exclude[1].get()
             self.input_list[self.file_options_var.get()]["maximum"]["exclude_lastday"] = maximum_exclude[0].get()
             self.input_list[self.file_options_var.get()]["maximum"]["exclude_lastday"] = maximum_exclude[1].get()
             self.input_list[self.file_options_var.get()]["xlabel"] = x_label.get()
             self.input_list[self.file_options_var.get()]["sg_filter"]["on"] = sg_filter.get()
-            self.input_list[self.file_options_var.get()]["sg_filter"]["color"] = sg_plot_color
             self.input_list[self.file_options_var.get()]["set_settings"] = set_settings.get()
             self.settings_window.destroy()
 
-        def setPlotColor(self, text, value):
-            plot_color = tkcc.askcolor(initialcolor=value, title=text)[-1]
-            return plot_color
+        def setPlotColor(self, sg):
+            if(sg):
+                plot_color = tkcc.askcolor(initialcolor=self.input_list[self.file_options_var.get()]["sg_filter"]["color"],
+                                           title="SG-Plot color")[-1]
+                if(plot_color == None):
+                    plot_color = "#800000"
+
+                self.input_list[self.file_options_var.get()]["sg_filter"]["color"] = plot_color
+            else:
+                plot_color = tkcc.askcolor(initialcolor=self.input_list[self.file_options_var.get()]["color"],
+                                           title="Plot color")[-1]
+                if(plot_color == None):
+                    plot_color = "#000000"
+
+                self.input_list[self.file_options_var.get()]["color"] = plot_color
 
         def setAdvancedSettings(self, peak_valley_points, peak_valley_percentage, sg_window_size, sg_poly_order):
             self.input_list[self.file_options_var.get()]["pv_points"] = peak_valley_points.get()
@@ -621,13 +634,13 @@ if __name__ == "__main__":
             self.menu.entryconfig("Exit", state="normal")
 
         def disableMenus(self):
-            menu.entryconfig("Files", state="disabled")
+            self.menu.entryconfig("Files", state="disabled")
             self.pisa.entryconfig("Start analysis", state="disabled")
             self.pisa.entryconfig("Cancel analysis", state="normal")
             self.pisa.entryconfig("Compare columns", state="disabled")
             self.pisa.entryconfig("Remove compared columns", state="disabled")
             self.pisa.entryconfig("Settings", state="disabled")
-            menu.entryconfig("Exit", state="disabled")
+            self.menu.entryconfig("Exit", state="disabled")
 
         def buildLabelSpinbox(self, parent_frame, text, value, increment, height):
             frame = tk.Frame(parent_frame)

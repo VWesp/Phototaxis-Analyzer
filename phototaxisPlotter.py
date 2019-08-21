@@ -5,8 +5,67 @@ import matplotlib
 matplotlib.use("PS")
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+from matplotlib.backends.backend_pdf import PdfPages
 
-def plotData(sample, progress, lock, data, datasheet, outputDirectory, dataNumber, informationOfTime,
+
+def plotData(file, input_list, progress, progress_per_step, lock):
+    columns = list(input_list[file]["data"])[2:]
+    time_points = np.unique(input_list[file]["data"]["h"] // 1 + input_list[file]["startingpoint"]).astype(float)
+    time_point_labels = None
+    hours = np.arange(0, time_points[-1], 24).astype(int)
+    if(input_list[file]["xlabel"] == "Days"):
+        timePointLabels = np.unique((time_points // 24)).astype(int)
+    elif(input_list[file]["xlabel"] == "Hours"):
+        timePointLabels = hours
+
+    pdf_document = PdfPages(input_list[file]["output"] + ".".join(file.split(".")[:-1]) + ".pdf")
+    for column in columns:
+        column_data = input_list[file]["data"][column]
+        max_voltage = np.amax(column_data)
+        min_voltage = np.amin(column_data)
+        data_mean_inverted = None
+        data_inverted = np.array((max_voltage+min_voltage) - column_data)
+        if(input_list[file]["minutepoint"] != -1):
+            minute_index = np.where(input_list[file]["data_minutepoints"] == input_list[file]["minutepoint"])[0][0]
+            minute_indices = np.arange(minute_index, len(input_list[file]["data"]["h"]),
+                                       input_list[file]["data_per_measurement"])
+            data_inverted_per_minutepoint = np.take(data_inverted, minute_indices)
+            data_mean_inverted = np.mean(data_inverted_per_minutepoint, axis=1)
+        else:
+            data_inverted_per_timepoint = np.array(np.split(data_inverted, input_list[file]["timepoint_indices"]))
+            data_mean_inverted = np.mean(data_inverted_per_timepoint[:,-input_list[file]["datanumber"]:],
+                                         axis=1)
+
+        figure = plt.figure()
+        plt.plot(time_points, data_mean_inverted, marker="o", markersize=input_list[file]["pointsize"],
+                 color=input_list[file]["color"], linestyle="-", label="raw data")
+        if(input_list[file]["sg_filter"]["on"]):
+            data_mean_inverted_smoothed = signal.savgol_filter(data_mean_inverted,
+                                                               input_list[file]["sg_filter"]["window"],
+                                                               input_list[file]["sg_filter"]["poly"])
+            plt.plot(time_points, data_mean_inverted_smoothed, color=input_list[file]["sg_filter"]["color"],
+                     linestyle="-", label="smoothed data")
+            plt.legend(bbox_to_anchor=(1.05,0.40))
+
+        for day in hours:
+            if(day != 0):
+                plt.axvline(day, ymin=0.1, ymax=0.9, color="black", linestyle=":")
+
+        plt.title(column + "\n" + file)
+        plt.xticks(hours, time_point_labels)
+        plt.xlabel(input_list[file]["xlabel"])
+        plt.ylabel("mV")
+        pdf_document.savefig(figure)
+        plt.close()
+        with lock:
+            progress.value += progress_per_step
+
+    pdf_document.close()
+    return pdf_document
+
+
+
+def plotData_outdated(sample, progress, lock, data, datasheet, outputDirectory, dataNumber, informationOfTime,
              timePointIndices, plotColor, minFirstDay, minLastDay, maxFirstDay, maxLastDay, points,
              amplitudePercentage, sgFilter, sgPlotColor, windowSize, polyOrder, period, startingPoint,\
              pointSize, label):
