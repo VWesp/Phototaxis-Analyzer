@@ -11,27 +11,29 @@ if __name__ == "__main__":
     import numpy as np
     import phototaxisPlotter
     from functools import partial
-    import time
+    import subprocess
 
 
     class Application(tk.Frame):
 
         def __init__(self, master=None):
             self.input_list = dict()
-            self.input_list["All"] = {"path": list(), "output": None, "pointsize": 3, "startingpoint": 12,
+            self.input_list["All"] = {"file_names": [], "path": list(), "output": None, "pointsize": 3, "startingpoint": 12,
                                       "datanumber": 5, "minutepoint": -1, "period": "Both", "color": "#000000",
                                       "minimum": {"exclude_firstday": False, "exclude_lastday": True},
                                       "maximum": {"exclude_firstday": True, "exclude_lastday": False},
                                       "xlabel": "Days","sg_filter": {"on": False, "window": 11, "poly": 3,
                                       "color": "#800000"},"pv_points": 1, "pv_amp_per": 3,
                                       "data_per_measurement": sys.maxsize,"timepoint_indices": list(),
-                                      "data_minutepoints": sys.maxsize, "file_names": [],"set_columns": dict(),
+                                      "data_minutepoints": sys.maxsize,"set_columns": dict(),
                                       "set_settings": False}
             tk.Frame.__init__(self, master)
             self.master = master
             self.manager = mp.Manager()
             self.progress = self.manager.Value("i", 0)
             self.lock = self.manager.Lock()
+            self.log_list = list()
+            self.cancel_analysis = False
             self.initWindow()
 
         def initWindow(self):
@@ -77,7 +79,7 @@ if __name__ == "__main__":
             self.menu.add_cascade(label="Files", menu=self.file)
             self.pisa = tk.Menu(self.menu, tearoff=0)
             self.pisa.add_command(label="Start analysis", command=self.startPhotoaxisAnalysis)
-            self.pisa.add_command(label="Cancel analysis")
+            self.pisa.add_command(label="Cancel analysis", command=self.cancelAnalysis)
             self.pisa.add_separator()
             self.pisa.add_command(label="Compare columns", command=self.configureColumnWindow)
             self.pisa.add_command(label="Remove compared columns", command=self.configureRemoveColumnsWindow)
@@ -106,15 +108,15 @@ if __name__ == "__main__":
                 if(not file_name in file_options_list):
                     self.file.entryconfig("Remove compared files", state="normal")
                     self.input_list["All"]["file_names"].append(file_name)
-                    self.input_list[file_name] = {"path": file, "output": os.path.dirname(file) + "/",
+                    self.input_list["All"]["path"].append(file)
+                    self.input_list[file_name] = {"file_names": [file_name], "path": [file], "output": os.path.dirname(file) + "/",
                                                   "pointsize": 3, "startingpoint": 12, "datanumber": 5,
                                                   "minutepoint": -1, "period": "Both", "color": "#000000",
                                                   "minimum": {"exclude_firstday": False, "exclude_lastday": True},
                                                   "maximum": {"exclude_firstday": True, "exclude_lastday": False},
                                                   "xlabel": "Days", "sg_filter": {"on": False, "window": 11, "poly": 3,
                                                   "color": "#800000"}, "pv_points": 1, "pv_amp_per": 3,
-                                                  "set_columns": dict(), "file_names": [file_name],
-                                                  "set_settings": False}
+                                                  "set_columns": dict(), "set_settings": False}
                     file_options_list.append(file_name)
                     self.file_options.set_menu(*file_options_list)
                     self.file_options_var.set(file_name)
@@ -134,8 +136,7 @@ if __name__ == "__main__":
                                 self.input_list["All"]["data_per_measurement"] = self.input_list[file_name]["data_per_measurement"]
 
                             if(len(self.input_list[file_name]["timepoint_indices"]) <
-                                                        len(self.input_list["All"]["timepoint_indices"]) or
-                                                        not len(self.input_list[file_name]["timepoint_indices"])):
+                                                        len(self.input_list["All"]["timepoint_indices"])):
                                 self.input_list["All"]["timepoint_indices"] = self.input_list[file_name]["timepoint_indices"]
 
                             if(self.input_list[file_name]["data_minutepoints"] < self.input_list["All"]["data_minutepoints"]):
@@ -154,20 +155,44 @@ if __name__ == "__main__":
                 overall_columns += len(list(self.input_list[file]["data"])[2:])
 
             progress_per_step = 100/overall_columns
-            threads = mp.cpu_count() if len(files) > mp.cpu_count() else len(files)
-            pool = mp.Pool(processes=threads)
+            pool = mp.Pool(processes=1)
             pool_map = partial(phototaxisPlotter.plotData, input_list=self.input_list, progress=self.progress,
                                progress_per_step=progress_per_step, lock=self.lock)
-            pdfs = pool.map_async(pool_map, files)
+            success = pool.map_async(pool_map, [self.file_options_var.get()])
             pool.close()
+            error = False
             while(self.progress.value != 100):
+                if(self.cancel_analysis or success.ready()):
+                    pool.terminate()
+                    error = True
+                    break
+
                 self.progressbar.set(self.progress.value)
                 self.update()
 
             self.progressbar.set(self.progress.value)
-
             pool.join()
             self.enableMenus()
+            if(not self.cancel_analysis and not error):
+                if(os.name == "nt"):
+                    os.startfile(self.input_list[self.file_options_var.get()]["output"])
+                else:
+                    subprocess.call(["xdg-open", self.input_list[self.file_options_var.get()]["output"]])
+
+                del self.log_list[:]
+                if(self.input_list[self.file_options_var.get()]["set_settings"]):
+                    self.getLogStats(self.file_options_var.get())
+                else:
+                    for file in self.input_list[self.file_options_var.get()]["file_names"]:
+                        self.getLogStats(file)
+
+                with open(self.input_list[self.file_options_var.get()]["output"] + "log.txt", "w") as log_writer:
+                    log_writer.write("#Log file of group: " + self.file_options_var.get() + "\n" + "\n".join(self.log_list))
+            elif(not self.cancel_analysis and error):
+                print(success.get())
+                error = False
+            elif(self.cancel_analysis):
+                self.cancel_analysis = False
 
         def configureFilesWindow(self):
             self.files_window = tk.Toplevel(self)
@@ -413,15 +438,21 @@ if __name__ == "__main__":
                         data_minutepoints = self.input_list[entry]["data_minutepoints"]
 
                 true_files = list()
+                file_paths = list()
                 none_chosen = True
+                output = None
                 for file,val in set_files.items():
                     if(val.get()):
                         true_files.append(file)
+                        file_paths.append(self.input_list[file]["path"][0])
+                        if(output == None):
+                            output = "/".join(os.path.dirname(file).split("/")[:-1]) + "/" + name.get() + "/"
+
                         val.set(False)
                         none_chosen = False
 
                 if(not none_chosen):
-                    self.input_list[name.get()] = {"path": list(), "output": None, "pointsize": 3,
+                    self.input_list[name.get()] = {"file_names": true_files, "path": file_paths, "output": output, "pointsize": 3,
                                                    "startingpoint": 12,"datanumber": 5, "minutepoint": -1,
                                                    "period": "Both", "color": "#000000",
                                                    "minimum": {"exclude_firstday": False, "exclude_lastday": True},
@@ -430,8 +461,7 @@ if __name__ == "__main__":
                                                    "poly": 3,"color": "#800000"}, "pv_points": 1, "pv_amp_per": 3,
                                                    "data_per_measurement": data_per_measurement,
                                                    "timepoint_indices": timepoint_indices,
-                                                   "data_minutepoints": data_minutepoints,
-                                                   "file_names": true_files,"set_columns": dict(),
+                                                   "data_minutepoints": data_minutepoints, "set_columns": dict(),
                                                    "set_settings": False}
                     self.file_options.set_menu(*file_list)
                     self.file_options_var.set(name.get())
@@ -472,18 +502,15 @@ if __name__ == "__main__":
                         else:
                             if(self.file_options_var.get() == "All"):
                                 self.input_list.pop(file, None)
-                            elif(self.file_options_var.get() in self.input_list["All"]["file_names"]):
+                            else:
                                 self.input_list["All"]["file_names"].remove(file)
-                                if(file in self.input_list["All"]["set_columns"]):
-                                    self.input_list["All"]["set_columns"].pop(file, None)
+                                self.input_list["All"]["set_columns"].pop(file, None)
 
                             for entry in reversed(list(self.input_list.keys())):
                                 if(not entry in self.input_list["All"]["file_names"]
                                    and file in self.input_list[entry]["file_names"]):
                                     self.input_list[entry]["file_names"].remove(file)
-                                    if(file in self.input_list[entry]["set_columns"]):
-                                        self.input_list[entry]["set_columns"].pop(file, None)
-
+                                    self.input_list[entry]["set_columns"].pop(file, None)
                                     if(not len(self.input_list[entry]["file_names"])):
                                         self.input_list.pop(entry, None)
 
@@ -494,7 +521,8 @@ if __name__ == "__main__":
                         file_list = ["Files"] + list(self.input_list.keys())
                         self.file_options.set_menu(*file_list)
                         self.file_options_var.set("All")
-                    else:
+
+                if(not len(self.input_list["All"]["file_names"])):
                         self.file_options.set_menu(*["Files"])
                         self.file_options.configure(state="disabled")
                         self.file.entryconfig("Compare files", state="disabled")
@@ -503,7 +531,7 @@ if __name__ == "__main__":
                         all_deleted = True
                         for child in self.info_frame.winfo_children():
                             child.pack_forget()
-                elif(self.file_options_var.get() == "All"):
+                else:
                     file_list = ["Files"] + list(self.input_list.keys())
                     self.file_options.set_menu(*file_list)
                     self.file_options_var.set("All")
@@ -618,8 +646,27 @@ if __name__ == "__main__":
 
             self.showComparisons()
 
+        def getLogStats(self, file_name):
+            self.log_list.append("#<---------- file " + file_name + " ---------->")
+            for attribute, value in self.input_list[file_name].items():
+                if(not attribute in ["data", "timepoint_indices"]):
+                    if(isinstance(value, list)):
+                        self.log_list.append("[" + attribute + "]\t" + ";".join(value))
+                    elif(attribute == "set_columns" and len(value)):
+                        column_list = list()
+                        for file,columns in value.items():
+                            column_list.append(file + "=" + "-".join(columns))
+
+                        self.log_list.append(";".join(column_list))
+                    else:
+                        self.log_list.append("[" + attribute + "]\t" + str(value))
+
+
         def closeWindow(self, window):
             window.destroy()
+
+        def cancelAnalysis(self):
+            self.cancel_analysis = True
 
         def closeApplication(self):
             exit()
