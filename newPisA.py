@@ -12,27 +12,29 @@ if __name__ == "__main__":
     import phototaxisPlotter
     from functools import partial
     import subprocess
+    import decimal
 
 
     class Application(tk.Frame):
 
         def __init__(self, master=None):
-            self.input_list = dict()
-            self.input_list["All"] = {"file_names": [], "path": list(), "output": None, "pointsize": 3, "startingpoint": 12,
+            self.input_list = {}
+            self.input_list["All"] = {"file_names": [], "path": [], "output": None, "pointsize": 3, "startingpoint": 12,
                                       "datanumber": 5, "minutepoint": -1, "period": "Both", "color": "#000000",
                                       "minimum": {"exclude_firstday": False, "exclude_lastday": True},
                                       "maximum": {"exclude_firstday": True, "exclude_lastday": False},
                                       "xlabel": "Days","sg_filter": {"on": False, "window": 11, "poly": 3,
                                       "color": "#800000"},"pv_points": 1, "pv_amp_per": 3,
-                                      "data_per_measurement": sys.maxsize,"timepoint_indices": list(),
-                                      "data_minutepoints": sys.maxsize,"set_columns": dict(),
+                                      "data_per_measurement": sys.maxsize,"timepoint_indices": [],
+                                      "data_minutepoints": sys.maxsize,"set_columns": {},
                                       "set_settings": False}
             tk.Frame.__init__(self, master)
             self.master = master
             self.manager = mp.Manager()
-            self.progress = self.manager.Value("i", 0)
+            self.progress = self.manager.Value("i", 0.0)
             self.lock = self.manager.Lock()
-            self.log_list = list()
+            self.log_list = []
+            self.columns_index_list = {"All": 0}
             self.cancel_analysis = False
             self.initWindow()
 
@@ -109,6 +111,7 @@ if __name__ == "__main__":
                     self.file.entryconfig("Remove compared files", state="normal")
                     self.input_list["All"]["file_names"].append(file_name)
                     self.input_list["All"]["path"].append(file)
+                    self.columns_index_list[file_name] = 0
                     self.input_list[file_name] = {"file_names": [file_name], "path": [file], "output": os.path.dirname(file) + "/",
                                                   "pointsize": 3, "startingpoint": 12, "datanumber": 5,
                                                   "minutepoint": -1, "period": "Both", "color": "#000000",
@@ -116,7 +119,7 @@ if __name__ == "__main__":
                                                   "maximum": {"exclude_firstday": True, "exclude_lastday": False},
                                                   "xlabel": "Days", "sg_filter": {"on": False, "window": 11, "poly": 3,
                                                   "color": "#800000"}, "pv_points": 1, "pv_amp_per": 3,
-                                                  "set_columns": dict(), "set_settings": False}
+                                                  "set_columns": {}, "set_settings": False}
                     file_options_list.append(file_name)
                     self.file_options.set_menu(*file_options_list)
                     self.file_options_var.set(file_name)
@@ -148,29 +151,31 @@ if __name__ == "__main__":
 
         def startPhotoaxisAnalysis(self):
             self.disableMenus()
-            self.progress.value = 0
+            self.progress.value = 0.0
             files = self.input_list[self.file_options_var.get()]["file_names"]
-            overall_columns = 0
+            progress_end = 0
             for file in files:
-                overall_columns += len(list(self.input_list[file]["data"])[2:])
+                progress_end += len(list(self.input_list[file]["data"])[2:])
 
-            progress_per_step = 100/overall_columns
+            for file,column_set in self.input_list[self.file_options_var.get()]["set_columns"].items():
+                progress_end += len(column_set)
+
             pool = mp.Pool(processes=1)
             pool_map = partial(phototaxisPlotter.plotData, input_list=self.input_list, progress=self.progress,
-                               progress_per_step=progress_per_step, lock=self.lock)
-            success = pool.map_async(pool_map, [self.file_options_var.get()])
+                               highest_columns_index=self.columns_index_list[self.file_options_var.get()], lock=self.lock)
+            single_plots_pdf = pool.map_async(pool_map, [self.file_options_var.get()])
             pool.close()
             error = False
-            while(self.progress.value != 100):
-                if(self.cancel_analysis or success.ready()):
+            while(self.progress.value != progress_end):
+                if(self.cancel_analysis or single_plots_pdf.ready()):
                     pool.terminate()
                     error = True
                     break
 
-                self.progressbar.set(self.progress.value)
+                self.progressbar.set(self.progress.value * (100/progress_end))
                 self.update()
 
-            self.progressbar.set(self.progress.value)
+            self.progressbar.set(self.progress.value * (100/progress_end))
             pool.join()
             self.enableMenus()
             if(not self.cancel_analysis and not error):
@@ -189,7 +194,7 @@ if __name__ == "__main__":
                 with open(self.input_list[self.file_options_var.get()]["output"] + "log.txt", "w") as log_writer:
                     log_writer.write("#Log file of group: " + self.file_options_var.get() + "\n" + "\n".join(self.log_list))
             elif(not self.cancel_analysis and error):
-                print(success.get())
+                print(single_plots_pdf.get())
                 error = False
             elif(self.cancel_analysis):
                 self.cancel_analysis = False
@@ -208,7 +213,7 @@ if __name__ == "__main__":
             label_frame.pack(fill="both", expand=1, pady=5)
 
             file_frame = tk.LabelFrame(self.files_window, text="Files", borderwidth=2, relief="groove")
-            set_files = dict()
+            set_files = {}
             for file in list(self.input_list.keys())[1:]:
                 row_frame = tk.Frame(file_frame)
                 file_var = tk.BooleanVar()
@@ -230,11 +235,11 @@ if __name__ == "__main__":
             self.column_window.wm_title("Comparing columns")
 
             column_frame = tk.LabelFrame(self.column_window, text="Columns", borderwidth=2, relief="groove")
-            set_column_data = dict()
+            set_column_data = {}
             for data_index in self.input_list[self.file_options_var.get()]["file_names"]:
                 data_frame = tk.LabelFrame(column_frame, text=data_index, borderwidth=2, relief="groove")
                 columns = list(self.input_list[data_index]["data"])[2:]
-                set_columns = dict()
+                set_columns = {}
                 row_frame = None
                 for column_index in range(len(columns)):
                     if(column_index % 10 == 0):
@@ -265,7 +270,7 @@ if __name__ == "__main__":
             remove_frame = tk.LabelFrame(self.remove_files_window, text="Compared files",
                                          borderwidth=2, relief="groove")
             files = self.input_list[self.file_options_var.get()]["file_names"]
-            set_files = dict()
+            set_files = {}
             for file in files:
                 file_frame = tk.Frame(remove_frame)
                 file_var = tk.BooleanVar()
@@ -289,11 +294,11 @@ if __name__ == "__main__":
             remove_frame = tk.LabelFrame(self.remove_columns_window, text="Compared columns",
                                          borderwidth=2, relief="groove")
             files = list(self.input_list[self.file_options_var.get()]["set_columns"].keys())
-            set_file_columns = dict()
+            set_file_columns = {}
             for file in files:
                 columns = self.input_list[self.file_options_var.get()]["set_columns"][file]
                 file_frame = tk.LabelFrame(remove_frame, text=file, borderwidth=2, relief="groove")
-                set_columns = dict()
+                set_columns = {}
                 for column in columns:
                     column_frame = tk.Frame(file_frame)
                     column_var = tk.BooleanVar()
@@ -425,7 +430,7 @@ if __name__ == "__main__":
             if(len(set_files) and name.get() and not name.get() in self.input_list):
                 file_list = ["Files"] + list(self.input_list.keys()) + [name.get()]
                 data_per_measurement = sys.maxsize
-                timepoint_indices = list()
+                timepoint_indices = []
                 data_minutepoints = sys.maxsize
                 for entry in self.input_list:
                     if(data_per_measurement < self.input_list[entry]["data_per_measurement"]):
@@ -437,8 +442,8 @@ if __name__ == "__main__":
                     if(data_minutepoints < self.input_list[entry]["data_minutepoints"]):
                         data_minutepoints = self.input_list[entry]["data_minutepoints"]
 
-                true_files = list()
-                file_paths = list()
+                true_files = []
+                file_paths = []
                 none_chosen = True
                 output = None
                 for file,val in set_files.items():
@@ -452,6 +457,7 @@ if __name__ == "__main__":
                         none_chosen = False
 
                 if(not none_chosen):
+                    self.columns_index_list[name.get()] = 0
                     self.input_list[name.get()] = {"file_names": true_files, "path": file_paths, "output": output, "pointsize": 3,
                                                    "startingpoint": 12,"datanumber": 5, "minutepoint": -1,
                                                    "period": "Both", "color": "#000000",
@@ -461,7 +467,7 @@ if __name__ == "__main__":
                                                    "poly": 3,"color": "#800000"}, "pv_points": 1, "pv_amp_per": 3,
                                                    "data_per_measurement": data_per_measurement,
                                                    "timepoint_indices": timepoint_indices,
-                                                   "data_minutepoints": data_minutepoints, "set_columns": dict(),
+                                                   "data_minutepoints": data_minutepoints, "set_columns": {},
                                                    "set_settings": False}
                     self.file_options.set_menu(*file_list)
                     self.file_options_var.set(name.get())
@@ -470,9 +476,9 @@ if __name__ == "__main__":
 
         def setColumns(self, set_column_data):
             if(len(set_column_data)):
-                chosen_list = list()
+                chosen_list = []
                 for file,data in set_column_data.items():
-                    true_columns = list()
+                    true_columns = []
                     none_chosen = True
                     for col,val in data.items():
                         if(val.get()):
@@ -483,11 +489,13 @@ if __name__ == "__main__":
                     chosen_list.append(none_chosen)
                     if(not none_chosen):
                         if(not file in self.input_list[self.file_options_var.get()]["set_columns"]):
-                            self.input_list[self.file_options_var.get()]["set_columns"][file] = list()
+                            self.input_list[self.file_options_var.get()]["set_columns"][file] = []
 
-                        self.input_list[self.file_options_var.get()]["set_columns"][file].append(" - ".join(true_columns))
+                        self.input_list[self.file_options_var.get()]["set_columns"][file].append(str(self.columns_index_list[self.file_options_var.get()])
+                                        + " :=: " + " - ".join(true_columns))
 
                 if(len(chosen_list) and not all(chosen_list)):
+                    self.columns_index_list[self.file_options_var.get()] += 1
                     self.pisa.entryconfig("Remove compared columns", state="normal")
                     self.showComparisons()
 
@@ -543,7 +551,7 @@ if __name__ == "__main__":
 
         def removeColumns(self, columns):
             if(len(columns)):
-                deleted_list = list()
+                deleted_list = []
                 for file,data in columns.items():
                     deleted = False
                     column_list = self.input_list[self.file_options_var.get()]["set_columns"]
@@ -646,14 +654,15 @@ if __name__ == "__main__":
 
             self.showComparisons()
 
-        def getLogStats(self, file_name):
-            self.log_list.append("#<---------- file " + file_name + " ---------->")
-            for attribute, value in self.input_list[file_name].items():
+        def getLogStats(self, group_name):
+            self.log_list.append("#<---------- file/group " + group_name + " ---------->")
+            for attribute,value in self.input_list[group_name].items():
                 if(not attribute in ["data", "timepoint_indices"]):
                     if(isinstance(value, list)):
                         self.log_list.append("[" + attribute + "]\t" + ";".join(value))
                     elif(attribute == "set_columns" and len(value)):
-                        column_list = list()
+                        column_list = []
+                        print(value)
                         for file,columns in value.items():
                             column_list.append(file + "=" + "-".join(columns))
 

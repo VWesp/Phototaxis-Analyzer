@@ -10,7 +10,7 @@ import matplotlib.patches as mpatches
 from matplotlib.backends.backend_pdf import PdfPages
 
 
-def plotData(selected_group, input_list, progress, progress_per_step, lock):
+def plotData(selected_group, input_list, highest_columns_index, progress, lock):
     try:
         if(not os.path.exists(input_list[selected_group]["output"])):
             os.makedirs(input_list[selected_group]["output"])
@@ -22,10 +22,11 @@ def plotData(selected_group, input_list, progress, progress_per_step, lock):
         with open(input_list[selected_group]["output"] + "phase_log.csv", "w") as phase_writer:
             phase_writer.write("")
 
-        overall_minimum_period_list = list()
-        overall_minimum_phase_list = list()
-        overall_maximum_period_list = list()
-        overall_maximum_phase_list = list()
+        overall_minimum_period_list = []
+        overall_minimum_phase_list = []
+        overall_maximum_period_list = []
+        overall_maximum_phase_list = []
+        x_y_values = {}
         for file in input_list[selected_group]["file_names"]:
             columns = list(input_list[file]["data"])[2:]
             settings = file
@@ -40,10 +41,15 @@ def plotData(selected_group, input_list, progress, progress_per_step, lock):
             elif(input_list[settings]["xlabel"] == "Hours"):
                 time_point_labels = hours
 
-            plot_minimum_period_list = list()
-            plot_minimum_phase_list = list()
-            plot_maximum_period_list = list()
-            plot_maximum_phase_list = list()
+            x_y_values[file] = {}
+            x_y_values[file]["time_points"] = time_points
+            x_y_values[file]["day_hours"] = hours
+            x_y_values[file]["time_point_labels"] = time_point_labels
+            x_y_values[file]["mean_values"]= {}
+            plot_minimum_period_list = []
+            plot_minimum_phase_list = []
+            plot_maximum_period_list = []
+            plot_maximum_phase_list = []
             for column in columns:
                 column_data = input_list[file]["data"][column]
                 max_voltage = np.amax(column_data)
@@ -61,6 +67,7 @@ def plotData(selected_group, input_list, progress, progress_per_step, lock):
                     data_inverted_mean = np.mean(data_inverted_per_timepoint[:,-input_list[settings]["datanumber"]:],
                                                  axis=1)
 
+                x_y_values[file]["mean_values"][column] = data_inverted_mean
                 figure = plt.figure()
                 plt.plot(time_points, data_inverted_mean, marker="o", markersize=input_list[settings]["pointsize"],
                          color=input_list[settings]["color"], linestyle="-", label="raw data")
@@ -84,10 +91,10 @@ def plotData(selected_group, input_list, progress, progress_per_step, lock):
                 mean_maximum_period = 0
                 maximum_periods = 0
                 points = input_list[settings]["pv_points"]
-                minimum_period_list = list()
-                minimum_phase_list = list()
-                maximum_period_list = list()
-                maximum_phase_list = list()
+                minimum_period_list = []
+                minimum_phase_list = []
+                maximum_period_list = []
+                maximum_phase_list = []
                 for day in hours:
                     day_start = day - (2 * points)
                     day_end = day + (22 + (2 * points))
@@ -192,10 +199,10 @@ def plotData(selected_group, input_list, progress, progress_per_step, lock):
                                    "h\n\n" + "mean min period: " + "{0:.2f}".format(mean_minimum_period / minimum_periods) + "h",
                                    bbox=props)
 
-                pdf_document.savefig(figure)
+                pdf_document.savefig(figure, bbox_inches="tight")
                 plt.close()
                 with lock:
-                    progress.value += progress_per_step
+                    progress.value += 1
 
             overall_minimum_period_list.append(file + "\n" + "\n".join(plot_minimum_period_list))
             overall_minimum_phase_list.append(file + "\n" + "\n".join(plot_minimum_phase_list))
@@ -217,82 +224,79 @@ def plotData(selected_group, input_list, progress, progress_per_step, lock):
                 phase_writer.write("Maximum\nSample;Phase;milliVolt\n" + "\n".join(overall_maximum_phase_list))
 
         pdf_document.close()
+        if(len(input_list[selected_group]["set_columns"])):
+            pdf_compared_document = PdfPages(input_list[selected_group]["output"] + selected_group + "_compared.pdf")
+            for i in range(highest_columns_index+1):
+                current_file_columns_list = []
+                for file,column_set in input_list[selected_group]["set_columns"].items():
+                    for columns in column_set:
+                        column_index = int(columns.split(" :=: ")[0])
+                        if(column_index == i):
+                            current_file_columns_list.append({file: columns})
+                            break
+
+                if(len(current_file_columns_list)):
+                    legend_patches = []
+                    first_plot = True
+                    figure = plt.figure()
+                    for file_column_item in current_file_columns_list:
+                        for file,column_set in file_column_item.items():
+                            columns = column_set.split(" :=: ")[1].split(" - ")
+                            x = x_y_values[file]["time_points"]
+                            for column in columns:
+                                y = x_y_values[file]["mean_values"][column]
+                                legend_patch, = plt.plot(x, y, label=file+"|"+column, marker="o", markersize=input_list[selected_group]["pointsize"],
+                                                         linestyle="-")
+                                legend_patches.append(legend_patch)
+                                if(first_plot):
+                                    plt.title(str(i) + "\n" + selected_group)
+                                    plt.xticks(x_y_values[file]["day_hours"], x_y_values[file]["time_point_labels"])
+                                    plt.xlabel(input_list[file]["xlabel"])
+                                    plt.ylabel("mV")
+                                    for day in x_y_values[file]["day_hours"]:
+                                        if(day in x_y_values[file]["time_points"]):
+                                            plt.axvline(day, color="black", linestyle=":")
+
+                                    firstPlot = False
+
+                        with lock:
+                            progress.value += 1
+
+                    plt.legend(handles=legend_patches, bbox_to_anchor=(1.05,0.5))
+                    pdf_compared_document.savefig(figure, bbox_inches="tight")
+                    plt.close()
+                    del legend_patches[:]
+
+            pdf_compared_document.close()
+
         return
     except Exception as ex:
         return ex
 
 
 
-def plotComparePlots(sampleList, progress, lock, plotList, datasheet, outputDirectory, informationOfTime,
-                     pointSize, label):
-
-    colorList = ("#000000", "#FF0000", "#FFD700", "#008000", "#0000FF", "#A52A2A", "#FF8C00", "#00FFFF", "#FF00FF",
-                 "#E9967A", "#BDB76B", "#00FF00", "#6A5ACD", "#2F4F4F", "#BC8F8F")
-    samples = sampleList.split(" - ")
-    patches = list()
-    colorIndex = 0
-    firstPlot = True
-    time_points = informationOfTime[0]
-    time_point_labels = informationOfTime[1]
-    days = informationOfTime[2]
-    figure = plt.figure()
-    for sample in samples:
-        plot = next(list(page.values()) for page in plotList if sample == list(page.keys())[0])[0][0]
-        x = plot[0]
-        y = plot[1]
-        legendPatch, = plt.plot(x, y, label=sample, marker="o", markersize=pointSize, color=colorList[colorIndex],
-                                linestyle="-")
-        patches.append(legendPatch)
-        if(firstPlot):
-            plt.title(sampleList + "\n" + datasheet.split("/")[-1])
-            plt.xticks(days, time_point_labels)
-            plt.xlabel(label)
-            plt.ylabel("mV")
-            for day in days:
-                if(day in time_points):
-                    plt.axvline(day, color="black", linestyle=":")
-
-            firstPlot = False
-
-        if(colorIndex == len(colorList)-1):
-            colorIndex = 0
-        else:
-            colorIndex += 1
-
-    plt.legend(handles=patches, bbox_to_anchor=(1.05,0.5))
-    figure.savefig(outputDirectory + "tmpCompare/" + sampleList + ".pdf", bbox_inches="tight")
-    plt.close()
-
-    del patches[:]
-    with lock:
-        progress.value += 1
-
-    return {sampleList: outputDirectory + "tmpCompare/" + sampleList + ".pdf"}
-
-
-
 def findPeaksAndValleys(y, points):
 
-    valleys = list()
-    peaks = list()
+    valleys = []
+    peaks = []
     if(len(y) > points*2):
         for i in range(points, len(y)-points, 1):
-            valleyFound = True
+            valley_found = True
             for j in range(1, points+1, 1):
                 if(y[i] > y[i-j] or y[i] > y[i+j]):
-                    valleyFound = False
+                    valley_found = False
                     break
 
-            if(valleyFound):
+            if(valley_found):
                 valleys.append(i)
 
-            peakFound = True
+            peak_found = True
             for j in range(1, points+1, 1):
                 if(y[i] < y[i-j] or y[i] < y[i+j]):
-                    peakFound = False
+                    peak_found = False
                     break
 
-            if(peakFound):
+            if(peak_found):
                 peaks.append(i)
 
     return (valleys, peaks)
@@ -301,41 +305,41 @@ def findPeaksAndValleys(y, points):
 
 def calculatePeakAndValleyMean(x, y, point, threshold, mode):
 
-    valueList = list()
-    indexList = list()
-    leftY = y[:point+1]
-    for i in range(len(leftY)-2, -1, -1):
+    value_list = []
+    index_list = []
+    left_y = y[:point+1]
+    for i in range(len(left_y)-2, -1, -1):
         if(mode == "min"):
-            if(leftY[i] > y[point]+threshold):
+            if(left_y[i] > y[point]+threshold):
                 break
-            elif(y[point] <= leftY[i] <= y[point]+threshold):
-                valueList.append(leftY[i])
-                indexList.append(i)
+            elif(y[point] <= left_y[i] <= y[point]+threshold):
+                value_list.append(left_y[i])
+                index_list.append(i)
         elif(mode == "max"):
-            if(leftY[i] < y[point]-threshold):
+            if(left_y[i] < y[point]-threshold):
                 break
-            elif(y[point] >= leftY[i] >= y[point]-threshold):
-                valueList.append(leftY[i])
-                indexList.append(i)
+            elif(y[point] >= left_y[i] >= y[point]-threshold):
+                value_list.append(left_y[i])
+                index_list.append(i)
 
-    indexList = list(reversed(indexList))
-    valueList.append(y[point])
-    indexList.append(point)
-    rightY = y[point:]
-    for i in range(1, len(rightY), 1):
+    index_list = list(reversed(index_list))
+    value_list.append(y[point])
+    index_list.append(point)
+    right_y = y[point:]
+    for i in range(1, len(right_y), 1):
         if(mode == "min"):
-            if(rightY[i] > y[point]+threshold):
+            if(right_y[i] > y[point]+threshold):
                 break
-            elif(y[point] <= rightY[i] <= y[point]+threshold):
-                valueList.append(rightY[i])
-                indexList.append(point+i)
+            elif(y[point] <= right_y[i] <= y[point]+threshold):
+                value_list.append(right_y[i])
+                index_list.append(point+i)
         elif(mode == "max"):
-            if(rightY[i] < y[point]-threshold):
+            if(right_y[i] < y[point]-threshold):
                 break
-            elif(y[point] >= rightY[i] >= y[point]-threshold):
-                valueList.append(rightY[i])
-                indexList.append(point+i)
+            elif(y[point] >= right_y[i] >= y[point]-threshold):
+                value_list.append(right_y[i])
+                index_list.append(point+i)
 
-    meanX = int(np.mean(np.take(x, indexList)))
-    meanY = np.mean(np.array(valueList))
-    return (meanX, meanY)
+    mean_x = int(np.mean(np.take(x, index_list)))
+    mean_y = np.mean(np.array(value_list))
+    return (mean_x, mean_y)
