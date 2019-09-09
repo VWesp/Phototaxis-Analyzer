@@ -1,10 +1,10 @@
 #Log file of group: All
-#<---------- file/group PhT64_4_2016-06-14_13-03-00.txt ---------->
-[file_names]	PhT64_4_2016-06-14_13-03-00.txt
-[path]	/home/valentin/git/Phototaxis-Analyzer/example/samples/PhT64_4_2016-06-14_13-03-00.txt
-[output]	/home/valentin/git/Phototaxis-Analyzer/example/samples/
+#<---------- file/group All ---------->
+[file_names]	PhT64_4_2016-06-14_13-03-00.txt;PhT64_4_2016-06-21_12-56-03.txt;PhT64_4_2016-06-28_12-47-21.txt
+[path]	/home/valentin/git/Phototaxis-Analyzer/example/samples/PhT64_4_2016-06-14_13-03-00.txt;/home/valentin/git/Phototaxis-Analyzer/example/samples/PhT64_4_2016-06-21_12-56-03.txt;/home/valentin/git/Phototaxis-Analyzer/example/samples/PhT64_4_2016-06-28_12-47-21.txt
+[output]	/home/valentin/git/Phototaxis-Analyzer/example/all/
 [pointsize]	3
-[startingpoint]	12
+[startingpoint]	10.0
 [datanumber]	5
 [minutepoint]	-1
 [period]	Both
@@ -12,50 +12,10 @@
 [minimum]	{'exclude_firstday': False, 'exclude_lastday': True}
 [maximum]	{'exclude_firstday': True, 'exclude_lastday': False}
 [xlabel]	Days
-[sg_filter]	{'on': False, 'window': 11, 'poly': 3, 'color': '#800000'}
+[sg_filter]	{'on': True, 'window': 11, 'poly': 3, 'color': '#800000'}
 [pv_points]	1
 [pv_amp_per]	3
-[set_columns]	{}
-[set_settings]	False
 [data_per_measurement]	120
 [data_minutepoints]	19
-#<---------- file/group PhT64_4_2016-06-21_12-56-03.txt ---------->
-[file_names]	PhT64_4_2016-06-21_12-56-03.txt
-[path]	/home/valentin/git/Phototaxis-Analyzer/example/samples/PhT64_4_2016-06-21_12-56-03.txt
-[output]	/home/valentin/git/Phototaxis-Analyzer/example/samples/
-[pointsize]	3
-[startingpoint]	12
-[datanumber]	5
-[minutepoint]	-1
-[period]	Both
-[color]	#000000
-[minimum]	{'exclude_firstday': False, 'exclude_lastday': True}
-[maximum]	{'exclude_firstday': True, 'exclude_lastday': False}
-[xlabel]	Days
-[sg_filter]	{'on': False, 'window': 11, 'poly': 3, 'color': '#800000'}
-[pv_points]	1
-[pv_amp_per]	3
-[set_columns]	{}
-[set_settings]	False
-[data_per_measurement]	120
-[data_minutepoints]	19
-#<---------- file/group PhT64_4_2016-06-28_12-47-21.txt ---------->
-[file_names]	PhT64_4_2016-06-28_12-47-21.txt
-[path]	/home/valentin/git/Phototaxis-Analyzer/example/samples/PhT64_4_2016-06-28_12-47-21.txt
-[output]	/home/valentin/git/Phototaxis-Analyzer/example/samples/
-[pointsize]	3
-[startingpoint]	12
-[datanumber]	5
-[minutepoint]	-1
-[period]	Both
-[color]	#000000
-[minimum]	{'exclude_firstday': False, 'exclude_lastday': True}
-[maximum]	{'exclude_firstday': True, 'exclude_lastday': False}
-[xlabel]	Days
-[sg_filter]	{'on': False, 'window': 11, 'poly': 3, 'color': '#800000'}
-[pv_points]	1
-[pv_amp_per]	3
-[set_columns]	{}
-[set_settings]	False
-[data_per_measurement]	120
-[data_minutepoints]	19
+PhT64_4_2016-06-14_13-03-00.txt=0 :=: 1 - 2-1 :=: 2 - 3-2 :=: 3 - 4;PhT64_4_2016-06-21_12-56-03.txt=0 :=: 2 - 3-1 :=: 3 - 4-2 :=: 1 - 4;PhT64_4_2016-06-28_12-47-21.txt=0 :=: 3 - 4-1 :=: 1 - 4-2 :=: 3 - 4
+[set_settings]	True

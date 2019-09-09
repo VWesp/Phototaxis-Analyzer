@@ -8,6 +8,7 @@ matplotlib.use("PS")
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib.backends.backend_pdf import PdfPages
+import traceback
 
 
 def plotData(selected_group, input_list, highest_columns_index, progress, lock):
@@ -270,8 +271,8 @@ def plotData(selected_group, input_list, highest_columns_index, progress, lock):
             pdf_compared_document.close()
 
         return
-    except Exception as ex:
-        return ex
+    except:
+        return traceback.format_exc()
 
 
 

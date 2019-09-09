@@ -2,8 +2,7 @@ if __name__ == "__main__":
     import multiprocessing as mp
     mp.freeze_support()
     import tkinter as tk
-    from tkinter import ttk
-    from tkinter import filedialog
+    from tkinter import ttk, filedialog, messagebox
     import tkinter.colorchooser as tkcc
     import os
     import sys
@@ -12,7 +11,7 @@ if __name__ == "__main__":
     import phototaxisPlotter
     from functools import partial
     import subprocess
-    import decimal
+    import traceback
 
 
     class Application(tk.Frame):
@@ -95,59 +94,69 @@ if __name__ == "__main__":
             self.menu.add_cascade(label="Exit", menu=self.exit)
 
         def openFile(self):
-            file = filedialog.askopenfilename(title = "Select phototaxis file",
-                                              filetypes = (("text files","*.txt"),("all files","*.*")))
-            if(len(file)):
-                if(not len(self.input_list["All"]["file_names"])):
-                    self.file.entryconfig("Compare files", state="normal")
-                    self.menu.entryconfig("PisA analysis", state="normal")
-                    self.pisa.entryconfig("Remove compared columns", state="disabled")
-                    self.file_options.configure(state="normal")
-                    self.input_list["All"]["output"] = "/".join(os.path.dirname(file).split("/")[:-1]) + "/all/"
+            file_name = None
+            try:
+                file = filedialog.askopenfilename(title = "Select phototaxis file",
+                                                  filetypes = (("text files","*.txt"),("all files","*.*")))
+                if(len(file)):
+                    if(not len(self.input_list["All"]["file_names"])):
+                        self.file.entryconfig("Compare files", state="normal")
+                        self.menu.entryconfig("PisA analysis", state="normal")
+                        self.pisa.entryconfig("Remove compared columns", state="disabled")
+                        self.file_options.configure(state="normal")
+                        self.input_list["All"]["output"] = "/".join(os.path.dirname(file).split("/")[:-1]) + "/all/"
 
-                file_options_list = ["Files"] + list(self.input_list.keys())
-                file_name = os.path.basename(file)
-                if(not file_name in file_options_list):
-                    self.file.entryconfig("Remove compared files", state="normal")
-                    self.input_list["All"]["file_names"].append(file_name)
-                    self.input_list["All"]["path"].append(file)
-                    self.columns_index_list[file_name] = 0
-                    self.input_list[file_name] = {"file_names": [file_name], "path": [file], "output": os.path.dirname(file) + "/",
-                                                  "pointsize": 3, "startingpoint": 12, "datanumber": 5,
-                                                  "minutepoint": -1, "period": "Both", "color": "#000000",
-                                                  "minimum": {"exclude_firstday": False, "exclude_lastday": True},
-                                                  "maximum": {"exclude_firstday": True, "exclude_lastday": False},
-                                                  "xlabel": "Days", "sg_filter": {"on": False, "window": 11, "poly": 3,
-                                                  "color": "#800000"}, "pv_points": 1, "pv_amp_per": 3,
-                                                  "set_columns": {}, "set_settings": False}
-                    file_options_list.append(file_name)
-                    self.file_options.set_menu(*file_options_list)
-                    self.file_options_var.set(file_name)
-                    data = pd.read_csv(file, sep="\t", header=int(self.header_line.get()), encoding="iso-8859-1")
-                    for column in data:
-                        data[column] = data[column].str.replace(",", ".").astype(float)
-                        data_int = data[column].astype(int)
-                        if(column == "h"):
-                            self.input_list[file_name]["data_per_measurement"] = np.argmax(np.array(data_int > 0))
-                            self.input_list[file_name]["timepoint_indices"] = np.arange(
-                                                        self.input_list[file_name]["data_per_measurement"],
-                                                        len(data[column]),
-                                                        self.input_list[file_name]["data_per_measurement"])
-                            self.input_list[file_name]["data_minutepoints"] = np.unique(
-                                                        (60 * (data[column] % 1)).astype(int))[-1]
-                            if(self.input_list[file_name]["data_per_measurement"] < self.input_list["All"]["data_per_measurement"]):
-                                self.input_list["All"]["data_per_measurement"] = self.input_list[file_name]["data_per_measurement"]
+                    file_options_list = ["Files"] + list(self.input_list.keys())
+                    file_name = os.path.basename(file)
+                    if(not file_name in file_options_list):
+                        self.file.entryconfig("Remove compared files", state="normal")
+                        self.input_list["All"]["file_names"].append(file_name)
+                        self.input_list["All"]["path"].append(file)
+                        self.columns_index_list[file_name] = 0
+                        self.input_list[file_name] = {"file_names": [file_name], "path": [file], "output": os.path.dirname(file) + "/",
+                                                      "pointsize": 3, "startingpoint": 12, "datanumber": 5,
+                                                      "minutepoint": -1, "period": "Both", "color": "#000000",
+                                                      "minimum": {"exclude_firstday": False, "exclude_lastday": True},
+                                                      "maximum": {"exclude_firstday": True, "exclude_lastday": False},
+                                                      "xlabel": "Days", "sg_filter": {"on": False, "window": 11, "poly": 3,
+                                                      "color": "#800000"}, "pv_points": 1, "pv_amp_per": 3,
+                                                      "set_columns": {}, "set_settings": False}
+                        file_options_list.append(file_name)
+                        self.file_options.set_menu(*file_options_list)
+                        self.file_options_var.set(file_name)
+                        data = pd.read_csv(file, sep="\t", header=int(self.header_line.get()), encoding="iso-8859-1")
+                        for column in data:
+                            data[column] = data[column].str.replace(",", ".").astype(float)
+                            data_int = data[column].astype(int)
+                            if(column == "h"):
+                                self.input_list[file_name]["data_per_measurement"] = np.argmax(np.array(data_int > 0))
+                                self.input_list[file_name]["timepoint_indices"] = np.arange(
+                                                            self.input_list[file_name]["data_per_measurement"],
+                                                            len(data[column]),
+                                                            self.input_list[file_name]["data_per_measurement"])
+                                self.input_list[file_name]["data_minutepoints"] = np.unique(
+                                                            (60 * (data[column] % 1)).astype(int))[-1]
+                                if(self.input_list[file_name]["data_per_measurement"] < self.input_list["All"]["data_per_measurement"]):
+                                    self.input_list["All"]["data_per_measurement"] = self.input_list[file_name]["data_per_measurement"]
 
-                            if(len(self.input_list[file_name]["timepoint_indices"]) <
-                                                        len(self.input_list["All"]["timepoint_indices"])):
-                                self.input_list["All"]["timepoint_indices"] = self.input_list[file_name]["timepoint_indices"]
+                                if(len(self.input_list[file_name]["timepoint_indices"]) <
+                                                            len(self.input_list["All"]["timepoint_indices"])):
+                                    self.input_list["All"]["timepoint_indices"] = self.input_list[file_name]["timepoint_indices"]
 
-                            if(self.input_list[file_name]["data_minutepoints"] < self.input_list["All"]["data_minutepoints"]):
-                                self.input_list["All"]["data_minutepoints"] = self.input_list[file_name]["data_minutepoints"]
+                                if(self.input_list[file_name]["data_minutepoints"] < self.input_list["All"]["data_minutepoints"]):
+                                    self.input_list["All"]["data_minutepoints"] = self.input_list[file_name]["data_minutepoints"]
 
-                    self.input_list[file_name]["data"] = data
+                        self.input_list[file_name]["data"] = data
 
-                self.showComparisons()
+                    self.showComparisons()
+            except Exception:
+                file_name_var = tk.BooleanVar()
+                file_name_var.set(True)
+                self.remove_files_window = tk.Toplevel(self)
+                self.removeFiles({file_name: file_name_var})
+                messagebox.showerror("File error", "An error occurred when opening a file. The file is most likely just in a wrong/unknown format."
+                                     + " Check the file and try again or open a new file. See the message below for more details:\n\n"
+                                     + traceback.format_exc())
 
         def startPhotoaxisAnalysis(self):
             self.disableMenus()
@@ -194,7 +203,8 @@ if __name__ == "__main__":
                 with open(self.input_list[self.file_options_var.get()]["output"] + "log.txt", "w") as log_writer:
                     log_writer.write("#Log file of group: " + self.file_options_var.get() + "\n" + "\n".join(self.log_list))
             elif(not self.cancel_analysis and error):
-                print(single_plots_pdf.get())
+                messagebox.showerror("Analysis error", "An error occurred while running the analysis. See the message below for more details:\n\n"
+                                     + single_plots_pdf.get()[0])
                 error = False
             elif(self.cancel_analysis):
                 self.cancel_analysis = False
@@ -660,10 +670,9 @@ if __name__ == "__main__":
                 if(not attribute in ["data", "timepoint_indices"]):
                     if(isinstance(value, list)):
                         self.log_list.append("[" + attribute + "]\t" + ";".join(value))
-                    elif(attribute == "set_columns" and len(value)):
+                    elif(attribute == "set_columns" and len(self.input_list[self.file_options_var.get()][attribute])):
                         column_list = []
-                        print(value)
-                        for file,columns in value.items():
+                        for file,columns in self.input_list[self.file_options_var.get()][attribute].items():
                             column_list.append(file + "=" + "-".join(columns))
 
                         self.log_list.append(";".join(column_list))
@@ -734,8 +743,11 @@ if __name__ == "__main__":
         def configureScrollbar(self, event):
             self.canvas.configure(scrollregion=self.canvas.bbox("all"))
 
-
-    root = tk.Tk()
-    root.geometry("380x400")
-    Application(root)
-    root.mainloop()
+    try:
+        root = tk.Tk()
+        root.geometry("380x400")
+        Application(root)
+        root.mainloop()
+    except Exception:
+        messagebox.showerror("Critical error", "A critical error occurred while executing the program. See the message below for more details:\n\n"
+                             + traceback.format_exc())
