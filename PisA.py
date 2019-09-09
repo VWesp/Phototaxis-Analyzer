@@ -687,7 +687,7 @@ if __name__ == "__main__":
             self.cancel_analysis = True
 
         def closeApplication(self):
-            exit()
+            self.quit()
 
         def enableMenus(self):
             self.menu.entryconfig("Files", state="normal")
