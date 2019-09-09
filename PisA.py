@@ -154,9 +154,8 @@ if __name__ == "__main__":
                 file_name_var.set(True)
                 self.remove_files_window = tk.Toplevel(self)
                 self.removeFiles({file_name: file_name_var})
-                messagebox.showerror("File error", "An error occurred when opening a file. The file is most likely just in a wrong/unknown format."
-                                     + " Check the file and try again or open a new file. See the message below for more details:\n\n"
-                                     + traceback.format_exc())
+                self.showErrorWindow("File error", "An error occurred when opening a file. The file is most likely just in a wrong/unknown format."
+                                     + " Check the file and try again or open a new file.", traceback.format_exc())
 
         def startPhotoaxisAnalysis(self):
             self.disableMenus()
@@ -203,8 +202,8 @@ if __name__ == "__main__":
                 with open(self.input_list[self.file_options_var.get()]["output"] + "log.txt", "w") as log_writer:
                     log_writer.write("#Log file of group: " + self.file_options_var.get() + "\n" + "\n".join(self.log_list))
             elif(not self.cancel_analysis and error):
-                messagebox.showerror("Analysis error", "An error occurred while running the analysis. See the message below for more details:\n\n"
-                                     + single_plots_pdf.get()[0])
+                messagebox.showErrorWindow("Analysis error", "An error occurred while running the analysis.",
+                                            single_plots_pdf.get()[0])
                 error = False
             elif(self.cancel_analysis):
                 self.cancel_analysis = False
@@ -236,8 +235,7 @@ if __name__ == "__main__":
             button_frame = tk.Frame(self.files_window)
             tk.Button(button_frame, text="Set", command=lambda:
                       self.setFiles(set_files, name)).pack(side="left", padx=30)
-            tk.Button(button_frame, text="Close", command=lambda:
-                      self.closeWindow(self.files_window)).pack(side="left", padx=30)
+            tk.Button(button_frame, text="Close", command=self.files_window.destroy).pack(side="left", padx=30)
             button_frame.pack(fill="both", expand=1, pady=5)
 
         def configureColumnWindow(self):
@@ -269,8 +267,7 @@ if __name__ == "__main__":
             button_frame = tk.Frame(self.column_window)
             tk.Button(button_frame, text="Set", command=lambda:
                       self.setColumns(set_column_data)).pack(side="left", padx=30)
-            tk.Button(button_frame, text="Close", command=lambda:
-                      self.closeWindow(self.column_window)).pack(side="left", padx=30)
+            tk.Button(button_frame, text="Close", command=self.column_window.destroy).pack(side="left", padx=30)
             button_frame.pack(fill="both", expand=1, pady=5)
 
         def configureRemoveFilesWindow(self):
@@ -293,8 +290,7 @@ if __name__ == "__main__":
             button_frame = tk.Frame(self.remove_files_window)
             tk.Button(button_frame, text="Set", command=lambda:
                       self.removeFiles(set_files)).pack(side="left", padx=30)
-            tk.Button(button_frame, text="Close", command=lambda:
-                      self.closeWindow(self.remove_files_window)).pack(side="left", padx=30)
+            tk.Button(button_frame, text="Close", command=self.remove_files_window.destroy).pack(side="left", padx=30)
             button_frame.pack(fill="both", expand=1, pady=5)
 
         def configureRemoveColumnsWindow(self):
@@ -324,8 +320,7 @@ if __name__ == "__main__":
             button_frame = tk.Frame(self.remove_columns_window)
             tk.Button(button_frame, text="Set", command=lambda:
                       self.removeColumns(set_file_columns)).pack(side="left", padx=30)
-            tk.Button(button_frame, text="Close", command=lambda:
-                      self.closeWindow(self.remove_columns_window)).pack(side="left", padx=30)
+            tk.Button(button_frame, text="Close", command=self.remove_columns_window.destroy).pack(side="left", padx=30)
             button_frame.pack(fill="both", expand=1, pady=5)
 
         def configureSettings(self):
@@ -401,7 +396,7 @@ if __name__ == "__main__":
             tk.Button(button_frame, text="Advanced",
                       command=self.configureAdvancedSettings).pack(side="left", padx=30)
             tk.Button(button_frame, text="Cancel",
-                      command=lambda: self.closeWindow(self.settings_window)).pack(side="left", padx=30)
+                      command=self.settings_window.destroy).pack(side="left", padx=30)
             button_frame.pack(fill="both", expand=1, pady=5)
 
         def configureAdvancedSettings(self):
@@ -432,8 +427,7 @@ if __name__ == "__main__":
             tk.Button(button_frame, text="Ok", command=lambda:
                       self.setAdvancedSettings(peak_valley_points, peak_valley_percentage,
                                                sg_window_size, sg_poly_order)).pack(side="left", padx=70)
-            tk.Button(button_frame, text="Cancel", command=lambda:
-                      self.closeWindow(self.advanced_settings_window)).pack(side="left", padx=70)
+            tk.Button(button_frame, text="Cancel", command=self.advanced_settings_window.destroy).pack(side="left", padx=70)
             button_frame.pack(fill="both", expand=1, pady=5)
 
         def setFiles(self, set_files, name):
@@ -557,7 +551,7 @@ if __name__ == "__main__":
                 if(not all_deleted):
                     self.checkComparedColumns()
 
-                self.closeWindow(self.remove_files_window)
+                self.remove_files_window.destroy()
 
         def removeColumns(self, columns):
             if(len(columns)):
@@ -575,7 +569,7 @@ if __name__ == "__main__":
                     deleted_list.append(deleted)
 
                 self.showComparisons()
-                self.closeWindow(self.remove_columns_window)
+                self.remove_columns_window.destroy()
                 if(all(deleted_list)):
                     self.pisa.entryconfig("Remove compared columns", state="disabled")
 
@@ -679,10 +673,6 @@ if __name__ == "__main__":
                     else:
                         self.log_list.append("[" + attribute + "]\t" + str(value))
 
-
-        def closeWindow(self, window):
-            window.destroy()
-
         def cancelAnalysis(self):
             self.cancel_analysis = True
 
@@ -742,6 +732,49 @@ if __name__ == "__main__":
 
         def configureScrollbar(self, event):
             self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+        def showErrorWindow(self, title, simple_message, detailed_message):
+            self.error_window = tk.Toplevel(self)
+            self.error_window.wm_title(title)
+            self.error_window.resizable(False, False)
+
+            simple_error_frame = tk.Frame(self.error_window)
+            simple_error_scrollbar = tk.Scrollbar(simple_error_frame)
+            simple_error_area = tk.Text(simple_error_frame, width=50, height=4)
+            simple_error_area.insert("1.0", simple_message)
+            simple_error_scrollbar.pack(side="right", fill="both")
+            simple_error_area.pack(pady=5)
+            simple_error_area.config(state="disabled")
+            simple_error_frame.pack(fill="both", expand=1)
+            simple_error_scrollbar.config(command=simple_error_area.yview)
+            simple_error_area.config(yscrollcommand=simple_error_scrollbar.set)
+
+            self.detailed_error_frame = tk.Frame(self.error_window)
+            button_frame = tk.Frame(self.error_window)
+            tk.Button(button_frame, text="Ok", command=self.error_window.destroy).pack(side="left", padx=50)
+            self.button_var = tk.StringVar()
+            self.button_var.set("Show details")
+            tk.Button(button_frame, textvariable=self.button_var, command=self.showHideDetailes).pack(side="left", padx=50)
+            button_frame.pack(fill="both", expand=1, pady=5)
+
+            detailed_error_scrollbar = tk.Scrollbar(self.detailed_error_frame)
+            detailed_error_area = tk.Text(self.detailed_error_frame, width=50, height=10)
+            detailed_error_area.insert("1.0", detailed_message)
+            detailed_error_scrollbar.pack(side="right", fill="both")
+            detailed_error_area.pack(pady=5)
+            detailed_error_area.config(state="disabled")
+            self.detailed_error_frame.pack(fill="both", expand=1)
+            detailed_error_scrollbar.config(command=detailed_error_area.yview)
+            detailed_error_area.config(yscrollcommand=detailed_error_scrollbar.set)
+            self.detailed_error_frame.pack_forget()
+
+        def showHideDetailes(self):
+            if(self.button_var.get() == "Show details"):
+                self.detailed_error_frame.pack()
+                self.button_var.set("Hide details")
+            else:
+                self.detailed_error_frame.pack_forget()
+                self.button_var.set("Show details")
 
     try:
         root = tk.Tk()
