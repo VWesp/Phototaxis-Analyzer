@@ -1,1024 +1,753 @@
-#!/usr/bin/env python3
-#Icon made by Smashicons (https://www.flaticon.com/authors/smashicons) from www.flaticon.com
-
 if __name__ == "__main__":
     import multiprocessing as mp
     mp.freeze_support()
-
-    import phototaxisPlotter
+    import tkinter as tk
+    from tkinter import ttk, filedialog, messagebox
+    import tkinter.colorchooser as tkcc
     import os
-    import shutil
-    import subprocess
+    import sys
     import pandas as pd
     import numpy as np
-    import traceback
-    import itertools
+    import phototaxisPlotter
     from functools import partial
-    from PyPDF2 import PdfFileMerger, PdfFileReader
-    import appJar
-    from tkinter import *
+    import subprocess
+    import traceback
 
-    data = None
-    header = 1
-    datasheet = ""
-    outputDirectory = ""
-    columnNames = list()
-    dataPerMeasurement = None
-    timePointIndices = None
-    dataMinutePoints = None
-    plotColor = None
-    sgPlotColor = None
-    comparePlots = list()
-    cancelAnalysis = None
-    exitApp = False
-    lbc = None
-    lbr = None
-    progress = None
-    lock = None
-    pages = None
-    compareResults = None
 
-    app = appJar.gui("PisA", "380x400")
-    app.winIcon = None
+    class Application(tk.Frame):
 
-    def buildAppJarGUI():
+        def __init__(self, master=None):
+            self.input_list = {}
+            self.input_list["All"] = {"file_names": [], "path": [], "output": None, "pointsize": 3, "startingpoint": 12,
+                                      "datanumber": 5, "minutepoint": -1, "period": "Both", "color": "#000000",
+                                      "minimum": {"exclude_firstday": False, "exclude_lastday": True},
+                                      "maximum": {"exclude_firstday": True, "exclude_lastday": False},
+                                      "xlabel": "Days","sg_filter": {"on": False, "window": 11, "poly": 3,
+                                      "color": "#800000"},"pv_points": 1, "pv_amp_per": 3,
+                                      "data_per_measurement": sys.maxsize,"timepoint_indices": [],
+                                      "data_minutepoints": sys.maxsize,"set_columns": {},
+                                      "set_settings": False}
+            tk.Frame.__init__(self, master)
+            self.master = master
+            self.manager = mp.Manager()
+            self.progress = self.manager.Value("i", 0.0)
+            self.lock = self.manager.Lock()
+            self.log_list = []
+            self.columns_index_list = {"All": 0}
+            self.cancel_analysis = False
+            self.initWindow()
 
-        global lbc
-        global lbr
+        def initWindow(self):
+            self.progress_frame = tk.LabelFrame(self, text="Analysis progress", borderwidth=2, relief="groove")
+            self.progressbar = tk.DoubleVar()
+            ttk.Progressbar(self.progress_frame, orient="horizontal", mode="determinate", variable=self.progressbar,
+                            length=380).pack()
+            self.progress_frame.pack()
 
-        app.setIcon("icon/leaning-tower-of-pisa.gif")
-        app.setTitle("PisA")
-        app.setBg("silver", override=True)
-        app.setFont(size=12, underline=False, slant="roman")
-        app.setLocation(300, 250)
-        app.setFastStop(True)
-        app.setResizable(canResize=False)
+            self.master.title("PisA - [P]hototax[is]-[A]nalyzer")
+            self.pack(fill="both", expand=1)
+            self.files_frame = tk.LabelFrame(self, text="Files", borderwidth=2, relief="groove")
+            self.file_options_frame = tk.Frame(self.files_frame)
+            self.file_options_var = tk.StringVar()
+            self.file_options_var.set("Files")
+            self.file_options = ttk.OptionMenu(self.file_options_frame, self.file_options_var, *["Files"],
+                                               command=lambda _: self.checkComparedColumns())
+            self.file_options.pack()
+            self.file_options.configure(state="disabled")
+            self.file_options_frame.pack()
+            self.header_line = self.buildLabelSpinbox(self.files_frame, "Set header line of file", 1, 1, 2)
+            self.files_frame.pack(fill="both", expand=0)
 
-        app.startFrame("TitleFrame")
-        app.addLabel("Title", "PisA: [P]hototax[is]-[A]nalyzer")
-        app.setLabelBg("Title", "orangered")
-        app.stopFrame()
+            self.canvas = tk.Canvas(self, borderwidth=3, relief="sunken")
+            self.info_frame = tk.LabelFrame(self.canvas, borderwidth=0)
+            self.info_scrollbar = tk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
+            self.canvas.configure(yscrollcommand=self.info_scrollbar.set, scrollregion=self.canvas.bbox("all"))
+            self.info_scrollbar.pack(side="right", fill="y")
+            self.info_frame.pack(fill="both", expand=1)
+            self.canvas.pack(fill="both", expand=1)
+            self.canvas.create_window((0,0), window=self.info_frame)
+            self.info_frame.bind("<Configure>", self.configureScrollbar)
 
-        inputMenus = ["Open", "Save"]
-        app.createMenu("File")
-        app.addMenuList("File", inputMenus, openPress)
+            self.menu = tk.Menu(self.master)
+            self.master.config(menu=self.menu)
+            self.file = tk.Menu(self.menu, tearoff=0)
+            self.file.add_command(label="Open", command=self.openFile)
+            self.file.add_separator()
+            self.file.add_command(label="Compare files", command=self.configureFilesWindow)
+            self.file.add_command(label="Remove compared files", command=self.configureRemoveFilesWindow)
+            self.file.entryconfig("Compare files", state="disabled")
+            self.file.entryconfig("Remove compared files", state="disabled")
+            self.menu.add_cascade(label="Files", menu=self.file)
+            self.pisa = tk.Menu(self.menu, tearoff=0)
+            self.pisa.add_command(label="Start analysis", command=self.startPhotoaxisAnalysis)
+            self.pisa.add_command(label="Cancel analysis", command=self.cancelAnalysis)
+            self.pisa.add_separator()
+            self.pisa.add_command(label="Compare columns", command=self.configureColumnWindow)
+            self.pisa.add_command(label="Remove compared columns", command=self.configureRemoveColumnsWindow)
+            self.pisa.add_separator()
+            self.pisa.add_command(label="Settings", command=self.configureSettings)
+            self.pisa.entryconfig("Cancel analysis", state="disabled")
+            self.menu.add_cascade(label="PisA analysis", menu=self.pisa)
+            self.menu.entryconfig("PisA analysis", state="disabled")
+            self.exit = tk.Menu(self.menu, tearoff=0)
+            self.exit.add_command(label="Exit PisA", command=self.closeApplication)
+            self.menu.add_cascade(label="Exit", menu=self.exit)
 
-        pisaMenus = ["Start analysis", "Cancel analysis", "-", "Compare columns", "Remove comparing columns"]
-        app.createMenu("PisA")
-        app.addMenuList("PisA", pisaMenus, pisaPress)
-        app.addMenuSeparator("PisA")
-        app.addSubMenu("PisA", "Set period")
-        app.addMenuRadioButton("Set period", "Period", "Minimum")
-        app.addMenuRadioButton("Set period", "Period", "Maximum")
-        app.addMenuRadioButton("Set period", "Period", "Both")
-        app.setMenuRadioButton("Set period", "Period", "Both")
-        app.addMenuSeparator("PisA")
-        app.addMenuItem("PisA", "PisA Settings", pisaPress)
-        app.disableMenuItem("PisA", "Start analysis")
-        app.disableMenuItem("PisA", "Cancel analysis")
-        app.disableMenuItem("PisA", "Compare columns")
-        app.disableMenuItem("PisA", "Remove comparing columns")
-        app.disableMenuItem("PisA", "Set period")
-        app.disableMenuItem("PisA", "PisA Settings")
+        def openFile(self):
+            file_name = None
+            try:
+                file = filedialog.askopenfilename(title = "Select phototaxis file",
+                                                  filetypes = (("text files","*.txt"),("all files","*.*")))
+                if(len(file)):
+                    if(not len(self.input_list["All"]["file_names"])):
+                        self.file.entryconfig("Compare files", state="normal")
+                        self.menu.entryconfig("PisA analysis", state="normal")
+                        self.pisa.entryconfig("Remove compared columns", state="disabled")
+                        self.file_options.configure(state="normal")
+                        self.input_list["All"]["output"] = "/".join(os.path.dirname(file).split("/")[:-1]) + "/all/"
 
-        app.createMenu("Settings")
-        app.addMenuItem("Settings", "Header", fileSettingsPress)
-        with app.subWindow("Header settings", modal=True):
-            app.setResizable(canResize=False)
-            app.setBg("silver", override=True)
-            app.setFont(size=12, underline=False, slant="roman")
-            app.startFrame("HeaderLabelFrame", row=0, column=0)
-            with app.labelFrame("Header"):
-                app.addEmptyLabel("HeaderFiller1")
-                app.addLabelEntry(" Header line ")
-                app.setEntry(" Header line ", 1)
-                app.addEmptyLabel("HeaderFiller2")
+                    file_options_list = ["Files"] + list(self.input_list.keys())
+                    file_name = os.path.basename(file)
+                    if(not file_name in file_options_list):
+                        self.file.entryconfig("Remove compared files", state="normal")
+                        self.input_list["All"]["file_names"].append(file_name)
+                        self.input_list["All"]["path"].append(file)
+                        self.columns_index_list[file_name] = 0
+                        self.input_list[file_name] = {"file_names": [file_name], "path": [file], "output": os.path.dirname(file) + "/",
+                                                      "pointsize": 3, "startingpoint": 12, "datanumber": 5,
+                                                      "minutepoint": -1, "period": "Both", "color": "#000000",
+                                                      "minimum": {"exclude_firstday": False, "exclude_lastday": True},
+                                                      "maximum": {"exclude_firstday": True, "exclude_lastday": False},
+                                                      "xlabel": "Days", "sg_filter": {"on": False, "window": 11, "poly": 3,
+                                                      "color": "#800000"}, "pv_points": 1, "pv_amp_per": 3,
+                                                      "set_columns": {}, "set_settings": False}
+                        file_options_list.append(file_name)
+                        self.file_options.set_menu(*file_options_list)
+                        self.file_options_var.set(file_name)
+                        data = pd.read_csv(file, sep="\t", header=int(self.header_line.get()), encoding="iso-8859-1")
+                        for column in data:
+                            data[column] = data[column].str.replace(",", ".").astype(float)
+                            data_int = data[column].astype(int)
+                            if(column == "h"):
+                                self.input_list[file_name]["data_per_measurement"] = np.argmax(np.array(data_int > 0))
+                                self.input_list[file_name]["timepoint_indices"] = np.arange(
+                                                            self.input_list[file_name]["data_per_measurement"],
+                                                            len(data[column]),
+                                                            self.input_list[file_name]["data_per_measurement"])
+                                self.input_list[file_name]["data_minutepoints"] = np.unique(
+                                                            (60 * (data[column] % 1)).astype(int))[-1]
+                                if(self.input_list[file_name]["data_per_measurement"] < self.input_list["All"]["data_per_measurement"]):
+                                    self.input_list["All"]["data_per_measurement"] = self.input_list[file_name]["data_per_measurement"]
 
-            app.stopFrame()
-            app.startFrame("HeaderButtonsFrame", row=1, column=0)
-            app.addNamedButton("Ok", "HeaderOk", fileSettingsPress, row=0, column=0)
-            app.addNamedButton("Cancel", "HeaderCancel", fileSettingsPress, row=0, column=1)
-            app.stopFrame()
+                                if(len(self.input_list[file_name]["timepoint_indices"]) <
+                                                            len(self.input_list["All"]["timepoint_indices"])):
+                                    self.input_list["All"]["timepoint_indices"] = self.input_list[file_name]["timepoint_indices"]
 
-        app.addMenuSeparator("Settings")
-        app.addMenuItem("Settings", "Reset settings", fileSettingsPress)
+                                if(self.input_list[file_name]["data_minutepoints"] < self.input_list["All"]["data_minutepoints"]):
+                                    self.input_list["All"]["data_minutepoints"] = self.input_list[file_name]["data_minutepoints"]
 
-        app.createMenu("Exit")
-        app.addMenuItem("Exit", "Exit PisA", exitPress)
+                        self.input_list[file_name]["data"] = data
 
-        with app.subWindow("Remove comparing columns", modal=True):
-            app.setResizable(canResize=False)
-            app.setBg("silver", override=True)
-            app.setFont(size=12, underline=False, slant="roman")
-            app.startFrame("ComparingPlotsFrame", row=0, column=0)
-            app.addLabel("Removable plots", "Comparing plots")
-            lbc = app.addListBox("Removable plots")
-            lbc.bind("<Double-1>", lambda *args: doubleClickAdd())
-            app.stopFrame()
-            app.startFrame("RemovingPlotsFrame", row=0, column=1)
-            app.addLabel("Removing plots", "Removing plots")
-            lbr = app.addListBox("Removing plots")
-            lbr.bind("<Double-1>", lambda *args: doubleClickRemove())
-            app.stopFrame()
-            app.startFrame("RemoveFrame", row=1, column=0)
-            app.addNamedButton("Remove", "RemoveOk", columnsPress)
-            app.stopFrame()
-            app.startFrame("CancelFrame", row=1, column=1)
-            app.addNamedButton("Cancel", "RemoveCancel", columnsPress)
-            app.stopFrame()
+                    self.showComparisons()
+            except Exception:
+                file_name_var = tk.BooleanVar()
+                file_name_var.set(True)
+                self.remove_files_window = tk.Toplevel(self)
+                self.removeFiles({file_name: file_name_var})
+                messagebox.showerror("File error", "An error occurred when opening a file. The file is most likely just in a wrong/unknown format."
+                                     + " Check the file and try again or open a new file. See the message below for more details:\n\n"
+                                     + traceback.format_exc())
 
-        with app.subWindow("Analysis settings", modal=True):
-            app.setResizable(canResize=False)
-            app.setBg("silver", override=True)
-            app.setFont(size=12, underline=False, slant="roman")
-            app.startFrame("AnalysisOptionsFrame", row=0, column=0)
-            with app.labelFrame("General plot settings"):
-                app.addEmptyLabel("AnalysisFiller1")
-                app.startFrame("GeneralOptionsFrame", row=1, column=0)
-                app.addLabelScale(" Plot point size ", row=0, column=0)
-                app.showScaleValue(" Plot point size ", show=True)
-                app.setScaleRange(" Plot point size ", 0, 20, curr=3)
-                app.setScaleIncrement(" Plot point size ", 1/20)
-                app.showScaleIntervals(" Plot point size ", 20)
-                app.addEmptyLabel("GeneralFiller1", row=0, column=1)
-                app.addEmptyLabel("GeneralFiller2", row=0, column=2)
-                app.addEmptyLabel("GeneralFiller3", row=0, column=3)
-                app.addEmptyLabel("GeneralFiller4", row=0, column=4)
-                app.addEmptyLabel("GeneralFiller5", row=0, column=5)
-                app.addNamedButton("Set color", "PlotColor", analysisSettingsPress, row=0, column=6)
-                app.stopFrame()
-                app.addEmptyLabel("AnalysisFiller2")
-                app.addLabelEntry(" Starting point ")
-                app.setEntry(" Starting point ", 12)
-                app.addEmptyLabel("AnalysisFiller3")
-                app.addLabelScale(" Data number ")
-                app.showScaleValue(" Data number ", show=True)
-                app.addEmptyLabel("AnalysisFiller4")
-                app.addLabelScale(" Data minute point ")
-                app.showScaleValue(" Data minute point ", show=True)
-                app.addEmptyLabel("AnalysisFiller5")
-                with app.labelFrame("Minimum"):
-                    app.addEmptyLabel("AnalysisFiller6", row=0, column=0)
-                    app.addCheckBox(" Exclude first Day [min]", row=1, column=0)
-                    app.addCheckBox(" Exclude last Day [min]", row=1, column=1)
-                    app.setCheckBox(" Exclude last Day [min]", ticked=True, callFunction=False)
-                    app.addEmptyLabel("AnalysisFiller7")
+        def startPhotoaxisAnalysis(self):
+            self.disableMenus()
+            self.progress.value = 0.0
+            files = self.input_list[self.file_options_var.get()]["file_names"]
+            progress_end = 0
+            for file in files:
+                progress_end += len(list(self.input_list[file]["data"])[2:])
 
-                with app.labelFrame("Maximum"):
-                    app.addEmptyLabel("AnalysisFiller8", row=0, column=0)
-                    app.addCheckBox(" Exclude first Day [max]", row=1, column=0)
-                    app.addCheckBox(" Exclude last Day [max]", row=1, column=1)
-                    app.setCheckBox(" Exclude first Day [max]", ticked=True, callFunction=False)
-                    app.addEmptyLabel("AnalysisFiller9")
+            for file,column_set in self.input_list[self.file_options_var.get()]["set_columns"].items():
+                progress_end += len(column_set)
 
-            with app.labelFrame("X-axis label"):
-                app.addEmptyLabel("AnalysisFiller10", row=0, column=0)
-                app.addRadioButton("Label", "Days", row=1, column=0)
-                app.addRadioButton("Label", "Hours", row=1, column=1)
-                app.addEmptyLabel("AnalysisFiller11")
+            pool = mp.Pool(processes=1)
+            pool_map = partial(phototaxisPlotter.plotData, input_list=self.input_list, progress=self.progress,
+                               highest_columns_index=self.columns_index_list[self.file_options_var.get()], lock=self.lock)
+            single_plots_pdf = pool.map_async(pool_map, [self.file_options_var.get()])
+            pool.close()
+            error = False
+            while(self.progress.value != progress_end):
+                if(self.cancel_analysis or single_plots_pdf.ready()):
+                    pool.terminate()
+                    error = True
+                    break
 
-            with app.labelFrame("SG-Filter"):
-                app.addEmptyLabel("AnalysisFiller12", row=0, column=0)
-                app.addCheckBox(" SG-Filter On", row=1, column=0)
-                app.addNamedButton("Set color", "SGPlotColor", analysisSettingsPress, row=1, column=1)
-                app.addEmptyLabel("AnalysisFiller13")
+                self.progressbar.set(self.progress.value * (100/progress_end))
+                self.update()
 
-            app.stopFrame()
-            app.startFrame("AnalysisButtonsFrame", row=3, column=0)
-            app.addNamedButton("Ok", "AnalysisOk", analysisSettingsPress, row=0, column=0)
-            app.addNamedButton("Advanced", "AnalysisAdvanced", analysisSettingsPress, row=0, column=1)
-            app.addNamedButton("Reset", "AnalysisReset", analysisSettingsPress, row=0, column=2)
-            app.stopFrame()
-
-        with app.subWindow("Advanced settings", modal=True):
-            app.setResizable(canResize=False)
-            app.setBg("silver", override=True)
-            app.setFont(size=12, underline=False, slant="roman")
-            app.startFrame("AdvancedOptionsFrame", row=0, column=0)
-            with app.labelFrame("Peak-Valley-Detection"):
-                app.addEmptyLabel("AdvancedFiller1")
-                app.addLabelSpinBox(" Points ", list(np.arange(1, 1000, 1)))
-                app.setSpinBox(" Points ", 1)
-                app.addEmptyLabel("AdvancedFiller2")
-
-            with app.labelFrame("Peak-Valley-Mean-Calculation"):
-                app.addEmptyLabel("AdvancedFiller3")
-                app.addLabelEntry(" Amplitude percentage %")
-                app.setEntry(" Amplitude percentage %", 3)
-                app.addEmptyLabel("AdvancedFiller4")
-
-            with app.labelFrame("Savitzky-Golay-Filter"):
-                app.addEmptyLabel("AdvancedFiller5")
-                app.addLabelEntry(" Window size ")
-                app.setEntry(" Window size ", 11)
-                app.addEmptyLabel("AdvancedFiller6")
-                app.addLabelEntry(" Poly order ")
-                app.setEntry(" Poly order ", 3)
-                app.addEmptyLabel("AdvancedFiller7")
-
-            with app.labelFrame("Threads"):
-                app.addEmptyLabel("AdvancedFiller8")
-                app.addLabelSpinBox(" Thread number ", list(np.arange(1, mp.cpu_count()+1, 1)))
+            self.progressbar.set(self.progress.value * (100/progress_end))
+            pool.join()
+            self.enableMenus()
+            if(not self.cancel_analysis and not error):
                 if(os.name == "nt"):
-                    app.setSpinBox(" Thread number ", 1, callFunction=False)
+                    os.startfile(self.input_list[self.file_options_var.get()]["output"])
                 else:
-                    app.setSpinBox(" Thread number ", mp.cpu_count(), callFunction=False)
-                app.addEmptyLabel("AdvancedFiller9")
+                    subprocess.call(["xdg-open", self.input_list[self.file_options_var.get()]["output"]])
 
-            app.stopFrame()
-            app.startFrame("AdvancecButtonsFrame", row=1, column=0)
-            app.addNamedButton("Ok", "AdvancedOk", advancedSettingsPress, row=0, column=0)
-            app.addNamedButton("Reset", "AdvancedReset", advancedSettingsPress, row=0, column=1)
-            app.stopFrame()
-
-        app.startFrame("MeterFrame")
-        app.addSplitMeter("Progress")
-        app.setMeterFill("Progress", ["forestgreen", "lavender"])
-        app.stopFrame()
-
-        app.startFrame("PaneFrame")
-        with app.labelFrame("Data"):
-            app.startScrollPane("Pane")
-            app.addEmptyLabel("MainFiller1")
-            app.addLabel("Input", " Input: ")
-            app.setLabelAlign("Input", "left")
-            app.addEmptyLabel("MainFiller2")
-            app.addLabel("Output", " Output: ")
-            app.setLabelAlign("Output", "left")
-            app.addEmptyLabel("MainFiller3")
-            app.addLabel("Plots", " Comparing plots:\n  None")
-            app.setLabelAlign("Plots", "left")
-            app.stopScrollPane()
-
-        app.stopFrame()
-        app.addStatusbar("Status")
-
-
-
-    def openPress(button):
-
-        global data
-        global header
-        global datasheet
-        global columnNames
-        global outputDirectory
-        global dataPerMeasurement
-        global dataMinutePoints
-        global timePointIndices
-        global plotColor
-        global sgPlotColor
-
-        if(button == "Open"):
-            try:
-                inputFile = app.openBox(title="Input datasheet file", fileTypes=[("datasheet files", "*.txt"),
-                                       ("all files", "*.*")])
-                if(inputFile != None and len(inputFile)):
-                    header = app.getEntry(" Header line ")
-                    if(not len(header)):
-                        header = 0
-                    else:
-                        try:
-                            header = int(header)
-                            if(header < 0):
-                                raise ValueError()
-                        except ValueError:
-                            app.warningBox("Value warning", "The header has to be a positive integer number!")
-                            return
-
-                    app.setLabel("Input", " Input: ")
-                    app.setLabel("Output", " Output: ")
-                    app.setLabel("Plots", " Comparing plots:\n  None")
-                    app.setStatusbar("Loading input file")
-                    if(datasheet != ""):
-                        try:
-                            app.destroySubWindow("Compare columns")
-                        except appJar.appjar.ItemLookupError:
-                            pass
-
-                        app.clearListBox("Removable plots", callFunction=False)
-                        app.clearListBox("Removing plots", callFunction=False)
-                        app.disableMenuItem("PisA", "Remove comparing columns")
-
-                    datasheet = inputFile
-                    del columnNames[:]
-                    del comparePlots[:]
-                    data = pd.read_csv(datasheet, sep="\t", header=int(header), encoding="iso-8859-1")
-                    dataInt = dict()
-                    dataMinutePoints = None
-                    for key in data:
-                        data[key] = data[key].str.replace(",", ".")
-                        data[key] = data[key].astype(float)
-                        dataInt[key] = data[key].astype(int)
-                        if(key == "h"):
-                            dataPerMeasurement = np.argmax(np.array(dataInt[key] > 0))
-                            timePointIndices = np.arange(dataPerMeasurement, len(data[key]), dataPerMeasurement)
-                            dataMinutePoints = (60 * (data[key] % 1)).astype(int)
-
-                    dataInt.clear()
-                    plotColor = "#000000"
-                    sgPlotColor = "#800000"
-                    with app.subWindow("Compare columns"):
-                        app.setLocation(700, 300)
-                        app.setResizable(canResize=False)
-                        app.setBg("silver", override=True)
-                        app.setFont(size=12, underline=False, slant="roman")
-                        app.startFrame("ComparePlotsFrame", row=0, column=0)
-                        with app.labelFrame("Columns"):
-                            app.addEmptyLabel("ColumnFiller1")
-                            columnNames = list(data.keys())[2:]
-                            row = 1
-                            for column in range(len(columnNames)):
-                                if(column != 0 and column % 6 == 0):
-                                    row += 1
-
-                                app.addCheckBox(columnNames[column], row, column % 6)
-
-                            app.addEmptyLabel("ColumnFiller2")
-
-                        app.stopFrame()
-                        app.startFrame("CompareButtonsFrame", row=1, column=0)
-                        app.addNamedButton("Set", "CompareSet", columnsPress, row=0, column=0)
-                        app.addNamedButton("Close", "CompareClose", columnsPress, row=0, column=1)
-                        app.stopFrame()
-
-                    app.setScaleRange(" Data number ", 0, dataPerMeasurement, curr=5)
-                    app.setScaleIncrement(" Data number ", 1/dataPerMeasurement)
-                    app.showScaleIntervals(" Data number ", dataPerMeasurement)
-                    app.setScaleRange(" Data minute point ", -1, np.unique(dataMinutePoints)[-1], curr=-1)
-                    app.setScaleIncrement(" Data minute point ", 1/np.unique(dataMinutePoints)[-1])
-                    app.showScaleIntervals(" Data minute point ", np.unique(dataMinutePoints)[-1]+1)
-                    if(os.name == "nt"):
-                        outputDirectory = "/".join(os.path.abspath(datasheet).split("\\")[:-1]) + "/"
-                    else:
-                        outputDirectory = "/".join(os.path.abspath(datasheet).split("/")[:-1]) + "/"
-
-                    app.enableMenuItem("PisA", "Start analysis")
-                    app.enableMenuItem("PisA", "Compare columns")
-                    app.enableMenuItem("PisA", "Set period")
-                    app.enableMenuItem("PisA", "PisA Settings")
-                    app.setLabel("Input", " Input: " + datasheet)
-                    app.setLabel("Output", " Output: " + outputDirectory)
-                    app.setLabel("Plots", " Comparing plots:\n  None")
-                    app.setMeter("Progress", 0)
-                    app.setStatusbar("Input file loaded")
-            except Exception:
-                outputDirectory = ""
-                app.disableMenuItem("PisA", "Start analysis")
-                app.disableMenuItem("PisA", "Compare columns")
-                app.disableMenuItem("PisA", "Set period")
-                app.disableMenuItem("PisA", "PisA Settings")
-                app.setStatusbar("Error file loading!")
-                app.warningBox("File loading error!", "An unexpected error occurred! Please check the error message" +
-                           " in the second window and retry!")
-                app.errorBox("File loading error!", traceback.format_exc())
-
-        if(button == "Save"):
-            output = app.directoryBox(title="Output directory")
-            if(output != None and len(output)):
-                outputDirectory = output + "/"
-                app.setLabel("Input", " Input: " + datasheet)
-                app.setLabel("Output", " Output: " + outputDirectory)
-
-
-
-    def pisaPress(button):
-
-        global pages
-        global compareResults
-        global cancelAnalysis
-
-        if(button == "Start analysis"):
-            app.disableMenuItem("File", "Open")
-            app.disableMenuItem("File", "Save")
-            app.disableMenuItem("PisA", "Start analysis")
-            app.enableMenuItem("PisA", "Cancel analysis")
-            app.disableMenuItem("PisA", "Compare columns")
-            app.disableMenuItem("PisA", "Remove comparing columns")
-            app.disableMenuItem("PisA", "Set period")
-            app.disableMenuItem("PisA", "PisA Settings")
-            app.disableMenuItem("Settings", "Header")
-            app.disableMenuItem("Settings", "Reset settings")
-            app.disableMenuItem("Exit", "Exit PisA")
-            app.hideSubWindow("Compare columns")
-            app.hideSubWindow("Remove comparing columns")
-            app.hideSubWindow("Analysis settings")
-            app.hideSubWindow("Advanced settings")
-            app.hideSubWindow("Header settings")
-
-            dataNumber = int(app.getScale(" Data number "))
-            minutePoint = int(app.getScale(" Data minute point "))
-            period = app.getMenuRadioButton("Set period", "Period")
-            startingPoint = app.getEntry(" Starting point ")
-            if(not len(startingPoint)):
-                startingPoint = 0
-            else:
-                try:
-                    startingPoint = float(startingPoint.replace(",", "."))
-                except ValueError:
-                    app.warningBox("Value error", "The starting point has to be a positive integer or floating point number!")
-                    enableMenus()
-                    return
-
-            pointSize = int(app.getScale(" Plot point size "))
-            minFirstDay = app.getCheckBox(" Exclude first Day [min]")
-            minLastDay = app.getCheckBox(" Exclude last Day [min]")
-            maxFirstDay = app.getCheckBox(" Exclude first Day [max]")
-            maxLastDay = app.getCheckBox(" Exclude last Day [max]")
-            label = app.getRadioButton("Label")
-            points = int(app.getSpinBox(" Points "))
-            amplitudePercentage = app.getEntry(" Amplitude percentage %")
-            if(not len(amplitudePercentage)):
-                amplitudePercentage = 3
-            else:
-                try:
-                    amplitudePercentage = float(amplitudePercentage)
-                    if(amplitudePercentage < 0):
-                        raise ValueError()
-                except ValueError:
-                    app.warningBox("Value warning", "The amplitude percentage has to be a positive integer number!")
-                    enableMenus()
-                    return
-
-            sgFilter = app.getCheckBox(" SG-Filter On")
-            windowSize = app.getEntry(" Window size ")
-            if(not len(windowSize)):
-                windowSize = 11
-            else:
-                try:
-                    windowSize = int(windowSize)
-                    if(windowSize < 0):
-                        raise ValueError()
-                except ValueError:
-                    app.warningBox("Value warning", "The window size has to be a positive integer number!")
-                    enableMenus()
-                    return
-
-            polyOrder = app.getEntry(" Poly order ")
-            if(not len(polyOrder)):
-                polyOrder = 3
-            else:
-                try:
-                    polyOrder = int(polyOrder)
-                    if(polyOrder < 0):
-                        raise ValueError()
-                except ValueError:
-                    app.warningBox("Value warning", "The poly order has to be a positive integer number!")
-                    enableMenus()
-                    return
-
-            checkFailed = False
-            if(int(windowSize) % 2 == 0 or int(windowSize) <= int(polyOrder)):
-                app.warningBox("Filter warning!", "Window size of the SG-Filter must be a positive odd integer" +
-                               " and larger than the order of the poly order!")
-                checkFailed = True
-
-            if(not checkFailed and not os.access(outputDirectory, os.W_OK | os.R_OK | os.X_OK)):
-                app.warningBox("Output folder warning!", "The output folder is not accessible! Please make sure" +
-                               " that it exist and is accessible!")
-                checkFailed = True
-
-            if(not checkFailed):
-                outputList = ["".join(datasheet.split("/")[-1].split(".")[:-1]) + ".pdf",
-                              "".join(datasheet.split("/")[-1].split(".")[:-1]) + "_compared.pdf", "phaseLog.csv",
-                              "periodLog.csv", "plotLog.csv"]
-                for outputFile in outputList:
-                    if(os.path.exists(outputDirectory + outputFile)):
-                        try:
-                            with open(outputDirectory + outputFile, "w") as fileReader:
-                                pass
-                        except PermissionError:
-                            app.warningBox("Output file warning!", "The output file '" + outputFile +
-                                           "' is not accessible! Please make sure that it is closed!")
-                            checkFailed = True
-                            break
-
-            if(checkFailed):
-                enableMenus()
-                return
-
-            threads = int(app.getSpinBox(" Thread number "))
-            if(os.path.exists(outputDirectory + "tmp")):
-                shutil.rmtree(outputDirectory + "tmp", ignore_errors=True)
-
-            os.makedirs(outputDirectory + "tmp")
-            progress.value = 0
-            progressSize = len(columnNames) + len(comparePlots)
-            try:
-                app.setStatusbar("Plotting datapoints - " +
-                                 "{0:.2f}".format((progress.value/progressSize)*100) + " %")
-                timePoints = np.unique(data["h"] // 1 + startingPoint).astype(float)
-                timePointLabels = None
-                days = np.arange(0, timePoints[-1], 24).astype(int)
-                if(label == "Days"):
-                    timePointLabels = np.unique((timePoints // 24)).astype(int)
-                elif(label == "Hours"):
-                    timePointLabels = days
-
-                minuteIndices = None
-                if(minutePoint != -1):
-                    minuteIndex = np.where(dataMinutePoints == minutePoint)[0][0]
-                    minuteIndices = np.arange(minuteIndex, len(data["h"]), dataPerMeasurement)
-
-                informationOfTime = [timePoints, timePointLabels, days, minuteIndices]
-                pages = None
-                pool = None
-                if(threads == 1):
-                    app.thread(startSingleThreaded_PlotData, columnNames=columnNames, progress=progress, lock=lock, data=data,
-                               datasheet=datasheet, outputDirectory=outputDirectory, dataNumber=dataNumber,
-                               informationOfTime=informationOfTime, timePointIndices=timePointIndices,
-                               plotColor=plotColor, minFirstDay=minFirstDay, minLastDay=minLastDay, maxFirstDay=maxFirstDay,
-                               maxLastDay=maxLastDay, points=points, amplitudePercentage=amplitudePercentage,
-                               sgFilter=sgFilter, sgPlotColor=sgPlotColor, windowSize=windowSize, polyOrder=polyOrder,
-                               period=period, startingPoint=startingPoint, pointSize=pointSize, label=label)
+                del self.log_list[:]
+                if(self.input_list[self.file_options_var.get()]["set_settings"]):
+                    self.getLogStats(self.file_options_var.get())
                 else:
-                    pool = mp.Pool(processes=threads)
-                    poolMap = partial(phototaxisPlotter.plotData, progress=progress, lock=lock, data=data,
-                                      datasheet=datasheet, outputDirectory=outputDirectory, dataNumber=dataNumber,
-                                      informationOfTime=informationOfTime, timePointIndices=timePointIndices,
-                                      plotColor=plotColor, minFirstDay=minFirstDay, minLastDay=minLastDay, maxFirstDay=maxFirstDay,
-                                      maxLastDay=maxLastDay, points=points, amplitudePercentage=amplitudePercentage,
-                                      sgFilter=sgFilter, sgPlotColor=sgPlotColor, windowSize=windowSize, polyOrder=polyOrder,
-                                      period=period, startingPoint=startingPoint, pointSize=pointSize, label=label)
-                    pages = pool.map_async(poolMap, columnNames)
-                    pool.close()
+                    for file in self.input_list[self.file_options_var.get()]["file_names"]:
+                        self.getLogStats(file)
 
-                while(progress.value != len(columnNames)):
-                    if(cancelAnalysis):
-                        if(threads > 1):
-                            pool.terminate()
+                with open(self.input_list[self.file_options_var.get()]["output"] + "log.txt", "w") as log_writer:
+                    log_writer.write("#Log file of group: " + self.file_options_var.get() + "\n" + "\n".join(self.log_list))
+            elif(not self.cancel_analysis and error):
+                messagebox.showerror("Analysis error", "An error occurred while running the analysis. See the message below for more details:\n\n"
+                                     + single_plots_pdf.get()[0])
+                error = False
+            elif(self.cancel_analysis):
+                self.cancel_analysis = False
 
-                        break
+        def configureFilesWindow(self):
+            self.files_window = tk.Toplevel(self)
+            self.files_window.wm_title("Comparing files")
 
-                    app.setMeter("Progress", (progress.value/progressSize)*100)
-                    app.setStatusbar("Plotting datapoints - " +
-                                     "{0:.2f}".format((progress.value/progressSize)*100) + " %")
-                    app.topLevel.update()
+            label_frame = tk.Frame(self.files_window)
+            label_text = tk.StringVar()
+            label_text.set("Set name of group")
+            tk.Label(label_frame, textvariable=label_text, height=2).pack(side="left")
+            name = tk.StringVar()
+            name.set("file group")
+            tk.Entry(label_frame, textvariable=name).pack(side="left")
+            label_frame.pack(fill="both", expand=1, pady=5)
 
-                app.setMeter("Progress", (progress.value/progressSize)*100)
-                app.setStatusbar("Plotting datapoints - " +
-                                 "{0:.2f}".format((progress.value/progressSize)*100) + " %")
-                if(threads > 1):
-                    pool.join()
-                    pages = pages.get()
+            file_frame = tk.LabelFrame(self.files_window, text="Files", borderwidth=2, relief="groove")
+            set_files = {}
+            for file in list(self.input_list.keys())[1:]:
+                row_frame = tk.Frame(file_frame)
+                file_var = tk.BooleanVar()
+                tk.Checkbutton(row_frame, text=" "+file, var=file_var).pack(side="left")
+                set_files[file] = file_var
+                row_frame.pack(fill="both", expand=1)
 
-                compareResults = None
-                if(os.path.exists(outputDirectory + "tmpCompare")):
-                    shutil.rmtree(outputDirectory + "tmpCompare", ignore_errors=True)
+            file_frame.pack()
 
-                os.makedirs(outputDirectory + "tmpCompare")
-                if(len(comparePlots) and not cancelAnalysis):
-                    app.setStatusbar("Comparing plots - " +
-                                     "{0:.2f}".format((progress.value/progressSize)*100) + " %")
-                    pool = None
-                    if(threads == 1):
-                        app.thread(startSingleThreaded_PlotComparePlots, comparePlots=comparePlots, progress=progress,
-                                   lock=lock, plotList=pages, datasheet=datasheet, outputDirectory=outputDirectory,
-                                   informationOfTime=informationOfTime, pointSize=pointSize, label=label)
-                    else:
-                        pool = mp.Pool(processes=threads)
-                        poolMap =  partial(phototaxisPlotter.plotComparePlots, progress=progress, lock=lock,
-                                           plotList=pages, datasheet=datasheet, outputDirectory=outputDirectory,
-                                           informationOfTime=informationOfTime, pointSize=pointSize, label=label)
-                        compareResults = pool.map_async(poolMap, comparePlots)
-                        pool.close()
+            button_frame = tk.Frame(self.files_window)
+            tk.Button(button_frame, text="Set", command=lambda:
+                      self.setFiles(set_files, name)).pack(side="left", padx=30)
+            tk.Button(button_frame, text="Close", command=lambda:
+                      self.closeWindow(self.files_window)).pack(side="left", padx=30)
+            button_frame.pack(fill="both", expand=1, pady=5)
 
-                    while(progress.value != len(columnNames) + len(comparePlots)):
-                        if(cancelAnalysis):
-                            if(threads > 1):
-                                pool.terminate()
+        def configureColumnWindow(self):
+            self.column_window = tk.Toplevel(self)
+            self.column_window.wm_title("Comparing columns")
 
-                            break
+            column_frame = tk.LabelFrame(self.column_window, text="Columns", borderwidth=2, relief="groove")
+            set_column_data = {}
+            for data_index in self.input_list[self.file_options_var.get()]["file_names"]:
+                data_frame = tk.LabelFrame(column_frame, text=data_index, borderwidth=2, relief="groove")
+                columns = list(self.input_list[data_index]["data"])[2:]
+                set_columns = {}
+                row_frame = None
+                for column_index in range(len(columns)):
+                    if(column_index % 10 == 0):
+                        row_frame = tk.Frame(data_frame)
 
-                        app.setMeter("Progress", (progress.value/progressSize)*100)
-                        app.setStatusbar("Comparing plots - " +
-                                         "{0:.2f}".format((progress.value/progressSize)*100) + " %")
-                        app.topLevel.update()
+                    column_var = tk.BooleanVar()
+                    tk.Checkbutton(row_frame, text=" "+columns[column_index], var=column_var).pack(side="left")
+                    set_columns[columns[column_index]] = column_var
+                    if(column_index % 10 == 0):
+                        row_frame.pack(fill="both", expand=1)
 
-                    app.setMeter("Progress", (progress.value/progressSize)*100)
-                    app.setStatusbar("Plotting datapoints - " +
-                                     "{0:.2f}".format((progress.value/progressSize)*100) + " %")
-                    if(threads > 1):
-                        pool.join()
-                        compareResults = compareResults.get()
+                set_column_data[data_index] = set_columns
+                data_frame.pack(pady=5)
 
-                if(not cancelAnalysis):
-                    minimumPhaseList = list()
-                    maximumPhaseList = list()
-                    minimumPeriodList = list()
-                    maximumPeriodList = list()
-                    merger = PdfFileMerger()
-                    maxMinimumPeriodLength = 0
-                    for sample in columnNames:
-                        sampleResults = next(list(page.values()) for page in pages
-                                                  if sample == list(page.keys())[0])[0]
-                        samplePage = sampleResults[1]
-                        minimumPhaseList.append(sample + ";" + "\n;".join(sampleResults[2]))
-                        maximumPhaseList.append(sample + ";" + "\n;".join(sampleResults[3]))
-                        minimumPeriodList.append(sample + ";" + ";".join(sampleResults[4]))
-                        maximumPeriodList.append(sample  + ";"+ ";".join(sampleResults[5]))
-                        if(len(sampleResults[4]) >= maxMinimumPeriodLength):
-                            maxMinimumPeriodLength = len(sampleResults[4]) + 1
+            column_frame.pack()
 
-                        merger.append(samplePage)
+            button_frame = tk.Frame(self.column_window)
+            tk.Button(button_frame, text="Set", command=lambda:
+                      self.setColumns(set_column_data)).pack(side="left", padx=30)
+            tk.Button(button_frame, text="Close", command=lambda:
+                      self.closeWindow(self.column_window)).pack(side="left", padx=30)
+            button_frame.pack(fill="both", expand=1, pady=5)
 
-                    outputFile = outputDirectory + "".join(datasheet.split("/")[-1].split(".")[:-1])
-                    if(os.path.exists(outputFile + ".pdf")):
-                        try:
-                            with open(outputFile + ".pdf", "w") as fileReader:
-                                pass
-                        except PermissionError:
-                            app.warningBox("Output file warning!", "The output file '" +
-                                           "".join(datasheet.split("/")[-1].split(".")[:-1]) + ".pdf" +
-                                           "' is not accessible! Please make sure that it is closed and" +
-                                           " restart the analysis!")
-                            shutil.rmtree(outputDirectory + "tmp", ignore_errors=True)
-                            shutil.rmtree(outputDirectory + "tmpCompare", ignore_errors=True)
-                            enableMenus()
-                            return
+        def configureRemoveFilesWindow(self):
+            self.remove_files_window = tk.Toplevel(self)
+            self.remove_files_window.wm_title("Remove set files")
 
-                    merger.write(outputFile + ".pdf")
-                    merger.close()
-                    if(len(comparePlots)):
-                        compareMerger = PdfFileMerger()
-                        for samples in comparePlots:
-                            samplesPage = next(list(page.values()) for page in compareResults
-                                                    if samples == list(page.keys())[0])[0]
-                            compareMerger.append(samplesPage)
+            remove_frame = tk.LabelFrame(self.remove_files_window, text="Compared files",
+                                         borderwidth=2, relief="groove")
+            files = self.input_list[self.file_options_var.get()]["file_names"]
+            set_files = {}
+            for file in files:
+                file_frame = tk.Frame(remove_frame)
+                file_var = tk.BooleanVar()
+                tk.Checkbutton(file_frame, text=" "+file, var=file_var).pack(side="left")
+                set_files[file] = file_var
+                file_frame.pack(fill="both", expand=1)
 
-                        if(os.path.exists(outputFile + "_compared.pdf")):
-                            try:
-                                with open(outputFile + "_compared.pdf", "w") as fileReader:
-                                    pass
-                            except PermissionError:
-                                app.warningBox("Output file warning!", "The output file '" +
-                                               "".join(datasheet.split("/")[-1].split(".")[:-1]) + "_compared.pdf"
-                                               +"' is not accessible! Please make sure that it is closed and" +
-                                               " restart the analysis!")
-                                shutil.rmtree(outputDirectory + "tmp", ignore_errors=True)
-                                shutil.rmtree(outputDirectory + "tmpCompare", ignore_errors=True)
-                                enableMenus()
-                                return
+            remove_frame.pack()
 
-                        compareMerger.write(outputFile + "_compared.pdf")
-                        compareMerger.close()
-                    try:
-                        if(period == "Minimum"):
-                            with open(outputDirectory + "phaseLog.csv", "w") as phaseWriter:
-                                phaseWriter.write("Minima\nSample;Phase [h];milliVolt [mV]\n" +
-                                                  "\n".join(minimumPhaseList))
-                            with open(outputDirectory + "periodLog.csv", "w") as periodWriter:
-                                periodWriter.write("Minima\nSample;Period [h]\n" + "\n".join(minimumPeriodList))
-                        elif(period == "Maximum"):
-                            with open(outputDirectory + "phaseLog.csv", "w") as phaseWriter:
-                                phaseWriter.write("Maxima\nSample;Phase [h];milliVolt [mV]\n" +
-                                                  "\n".join(maximumPhaseList))
-                            with open(outputDirectory + "periodLog.csv", "w") as periodWriter:
-                                periodWriter.write("Maxima\nSample;Period [h]\n" + "\n".join(maximumPeriodList))
+            button_frame = tk.Frame(self.remove_files_window)
+            tk.Button(button_frame, text="Set", command=lambda:
+                      self.removeFiles(set_files)).pack(side="left", padx=30)
+            tk.Button(button_frame, text="Close", command=lambda:
+                      self.closeWindow(self.remove_files_window)).pack(side="left", padx=30)
+            button_frame.pack(fill="both", expand=1, pady=5)
+
+        def configureRemoveColumnsWindow(self):
+            self.remove_columns_window = tk.Toplevel(self)
+            self.remove_columns_window.wm_title("Remove set columns")
+
+            remove_frame = tk.LabelFrame(self.remove_columns_window, text="Compared columns",
+                                         borderwidth=2, relief="groove")
+            files = list(self.input_list[self.file_options_var.get()]["set_columns"].keys())
+            set_file_columns = {}
+            for file in files:
+                columns = self.input_list[self.file_options_var.get()]["set_columns"][file]
+                file_frame = tk.LabelFrame(remove_frame, text=file, borderwidth=2, relief="groove")
+                set_columns = {}
+                for column in columns:
+                    column_frame = tk.Frame(file_frame)
+                    column_var = tk.BooleanVar()
+                    tk.Checkbutton(column_frame, text=" "+column, var=column_var).pack(side="left")
+                    set_columns[column] = column_var
+                    column_frame.pack(fill="both", expand=1)
+
+                set_file_columns[file] = set_columns
+                file_frame.pack(pady=5)
+
+            remove_frame.pack()
+
+            button_frame = tk.Frame(self.remove_columns_window)
+            tk.Button(button_frame, text="Set", command=lambda:
+                      self.removeColumns(set_file_columns)).pack(side="left", padx=30)
+            tk.Button(button_frame, text="Close", command=lambda:
+                      self.closeWindow(self.remove_columns_window)).pack(side="left", padx=30)
+            button_frame.pack(fill="both", expand=1, pady=5)
+
+        def configureSettings(self):
+            self.settings_window = tk.Toplevel(self)
+            self.settings_window.wm_title("Analysis settings")
+
+            self.general_settings_frame = tk.LabelFrame(self.settings_window, text="General settings",
+                                                        borderwidth=2, relief="groove")
+
+            period_frame = tk.Frame(self.general_settings_frame)
+            label_text = tk.StringVar()
+            label_text.set("Amplitude period")
+            tk.Label(period_frame, textvariable=label_text, height=2).pack(side="left", padx=5)
+            period = tk.StringVar()
+            ttk.OptionMenu(period_frame, period, *["Period", "Minimum", "Maximum", "Both"]).pack(side="left", padx=30)
+            period.set(self.input_list[self.file_options_var.get()]["period"])
+            period_frame.pack()
+
+            point_size = self.buildLabelScale(self.general_settings_frame, "Point size\nof plot",
+                                              self.input_list[self.file_options_var.get()]["pointsize"], 0, 20)
+            starting_point = self.buildLabelSpinbox(self.general_settings_frame, "Starting point\nof plot",
+                                                    self.input_list[self.file_options_var.get()]["startingpoint"],
+                                                    0.1, 3)
+            data_number = self.buildLabelScale(self.general_settings_frame, "Number of\nused data points",
+                                               self.input_list[self.file_options_var.get()]["datanumber"], 0,
+                                               self.input_list[self.file_options_var.get()]["data_per_measurement"])
+            minute_point = self.buildLabelScale(self.general_settings_frame, "Data minute point",
+                                                self.input_list[self.file_options_var.get()]["minutepoint"], -1,
+                                                self.input_list[self.file_options_var.get()]["data_minutepoints"])
+
+            tk.Button(self.general_settings_frame, text="Color of plot", command=lambda:
+                      self.setPlotColor(False)).pack()
+            self.general_settings_frame.pack(fill="both", expand=1)
+
+            minimum_exclude = self.buildExcludeField(self.settings_window, "Minimum", " Exclude first day",
+                                                     self.input_list[self.file_options_var.get()]["minimum"]["exclude_firstday"],
+                                                     " Exclude last day",
+                                                     self.input_list[self.file_options_var.get()]["minimum"]["exclude_lastday"])
+            maximum_exclude = self.buildExcludeField(self.settings_window, "Maximum", " Exclude first day",
+                                                     self.input_list[self.file_options_var.get()]["maximum"]["exclude_firstday"],
+                                                     " Exclude last day",
+                                                     self.input_list[self.file_options_var.get()]["maximum"]["exclude_lastday"])
+
+            x_label_frame = tk.LabelFrame(self.settings_window, text="X-axis label", borderwidth=2, relief="groove")
+            x_label = tk.StringVar()
+            tk.Radiobutton(x_label_frame, text="Days", variable=x_label, value="Days").pack(side="left", padx=50)
+            tk.Radiobutton(x_label_frame, text="Hours", variable=x_label, value="Hours").pack(side="left", padx=50)
+            x_label.set(self.input_list[self.file_options_var.get()]["xlabel"])
+            x_label_frame.pack(fill="both", expand=1, pady=5)
+
+            sg_frame = tk.LabelFrame(self.settings_window, text="Sg-Filter", borderwidth=2, relief="groove")
+            sg_filter = tk.BooleanVar()
+            sg_filter.set(self.input_list[self.file_options_var.get()]["sg_filter"]["on"])
+            tk.Checkbutton(sg_frame, text=" Turn filter on", var=sg_filter).pack(side="left", padx=20)
+            sg_plot_color = tk.Button(sg_frame, text="Set color of SG-Plot", command=lambda:
+                                      self.setPlotColor(True)).pack(side="left")
+            sg_frame.pack(fill="both", expand=1, pady=5)
+
+            set_settings = tk.BooleanVar()
+            set_settings.set(self.input_list[self.file_options_var.get()]["set_settings"])
+            if(not self.file_options_var.get() in self.input_list["All"]["file_names"]):
+                set_settings_frame = tk.LabelFrame(self.settings_window, text="Group settings", borderwidth=2,
+                                                   relief="groove")
+                tk.Checkbutton(set_settings_frame, text=" Set settings for all files in the group",
+                                              var=set_settings).pack(side="left", padx=20)
+                set_settings_frame.pack(fill="both", expand=1, pady=5)
+
+            button_frame = tk.Frame(self.settings_window)
+            tk.Button(button_frame, text="Ok", command=lambda:
+                      self.setGeneralSettings(point_size, starting_point, data_number, minute_point,
+                                              period, minimum_exclude, maximum_exclude, x_label, sg_filter,
+                                              set_settings)).pack(side="left", padx=30)
+            tk.Button(button_frame, text="Advanced",
+                      command=self.configureAdvancedSettings).pack(side="left", padx=30)
+            tk.Button(button_frame, text="Cancel",
+                      command=lambda: self.closeWindow(self.settings_window)).pack(side="left", padx=30)
+            button_frame.pack(fill="both", expand=1, pady=5)
+
+        def configureAdvancedSettings(self):
+            self.advanced_settings_window = tk.Toplevel(self.settings_window)
+            self.advanced_settings_window.wm_title("Advanced settings")
+
+            self.peak_valley_frame = tk.LabelFrame(self.advanced_settings_window, text="Peak-Valley settings",
+                                              borderwidth=2, relief="groove")
+            peak_valley_points = self.buildLabelSpinbox(self.peak_valley_frame, "Peak-Valley\ndetection points",
+                                                        self.input_list[self.file_options_var.get()]["pv_points"],
+                                                        1, 3)
+            peak_valley_percentage = self.buildLabelSpinbox(self.peak_valley_frame, "Peak-Valley\namplitude percentage",
+                                                            self.input_list[self.file_options_var.get()]["pv_amp_per"],
+                                                            0.1, 3)
+            self.peak_valley_frame.pack(fill="both", expand=1)
+
+            self.sg_filter_frame = tk.LabelFrame(self.advanced_settings_window, text="Savitzky-Golay-Filter settings",
+                                            borderwidth=2, relief="groove")
+            sg_window_size = self.buildLabelSpinbox(self.sg_filter_frame, "SG-Filter window size",
+                                                    self.input_list[self.file_options_var.get()]["sg_filter"]["window"],
+                                                    1, 2)
+            sg_poly_order = self.buildLabelSpinbox(self.sg_filter_frame, "SG-Filter poly order",
+                                                   self.input_list[self.file_options_var.get()]["sg_filter"]["poly"],
+                                                   1, 2)
+            self.sg_filter_frame.pack(fill="both", expand=1, pady=5)
+
+            button_frame = tk.Frame(self.advanced_settings_window)
+            tk.Button(button_frame, text="Ok", command=lambda:
+                      self.setAdvancedSettings(peak_valley_points, peak_valley_percentage,
+                                               sg_window_size, sg_poly_order)).pack(side="left", padx=70)
+            tk.Button(button_frame, text="Cancel", command=lambda:
+                      self.closeWindow(self.advanced_settings_window)).pack(side="left", padx=70)
+            button_frame.pack(fill="both", expand=1, pady=5)
+
+        def setFiles(self, set_files, name):
+            if(len(set_files) and name.get() and not name.get() in self.input_list):
+                file_list = ["Files"] + list(self.input_list.keys()) + [name.get()]
+                data_per_measurement = sys.maxsize
+                timepoint_indices = []
+                data_minutepoints = sys.maxsize
+                for entry in self.input_list:
+                    if(data_per_measurement < self.input_list[entry]["data_per_measurement"]):
+                        data_per_measurement = self.input_list[entry]["data_per_measurement"]
+
+                    if(len(timepoint_indices) < len(self.input_list[entry]["timepoint_indices"])):
+                        timepoint_indices = self.input_list[entry]["timepoint_indices"]
+
+                    if(data_minutepoints < self.input_list[entry]["data_minutepoints"]):
+                        data_minutepoints = self.input_list[entry]["data_minutepoints"]
+
+                true_files = []
+                file_paths = []
+                none_chosen = True
+                output = None
+                for file,val in set_files.items():
+                    if(val.get()):
+                        true_files.append(file)
+                        file_paths.append(self.input_list[file]["path"][0])
+                        if(output == None):
+                            output = "/".join(os.path.dirname(file).split("/")[:-1]) + "/" + name.get() + "/"
+
+                        val.set(False)
+                        none_chosen = False
+
+                if(not none_chosen):
+                    self.columns_index_list[name.get()] = 0
+                    self.input_list[name.get()] = {"file_names": true_files, "path": file_paths, "output": output, "pointsize": 3,
+                                                   "startingpoint": 12,"datanumber": 5, "minutepoint": -1,
+                                                   "period": "Both", "color": "#000000",
+                                                   "minimum": {"exclude_firstday": False, "exclude_lastday": True},
+                                                   "maximum": {"exclude_firstday": True, "exclude_lastday": False},
+                                                   "xlabel": "Days", "sg_filter": {"on": False, "window": 11,
+                                                   "poly": 3,"color": "#800000"}, "pv_points": 1, "pv_amp_per": 3,
+                                                   "data_per_measurement": data_per_measurement,
+                                                   "timepoint_indices": timepoint_indices,
+                                                   "data_minutepoints": data_minutepoints, "set_columns": {},
+                                                   "set_settings": False}
+                    self.file_options.set_menu(*file_list)
+                    self.file_options_var.set(name.get())
+                    self.file.entryconfig("Remove compared files", state="normal")
+                    self.showComparisons()
+
+        def setColumns(self, set_column_data):
+            if(len(set_column_data)):
+                chosen_list = []
+                for file,data in set_column_data.items():
+                    true_columns = []
+                    none_chosen = True
+                    for col,val in data.items():
+                        if(val.get()):
+                            true_columns.append(col)
+                            val.set(False)
+                            none_chosen = False
+
+                    chosen_list.append(none_chosen)
+                    if(not none_chosen):
+                        if(not file in self.input_list[self.file_options_var.get()]["set_columns"]):
+                            self.input_list[self.file_options_var.get()]["set_columns"][file] = []
+
+                        self.input_list[self.file_options_var.get()]["set_columns"][file].append(str(self.columns_index_list[self.file_options_var.get()])
+                                        + " :=: " + " - ".join(true_columns))
+
+                if(len(chosen_list) and not all(chosen_list)):
+                    self.columns_index_list[self.file_options_var.get()] += 1
+                    self.pisa.entryconfig("Remove compared columns", state="normal")
+                    self.showComparisons()
+
+        def removeFiles(self, files):
+            if(len(files)):
+                for file,val in files.items():
+                    if(val.get()):
+                        self.input_list[self.file_options_var.get()]["file_names"].remove(file)
+                        if(not self.file_options_var.get() in self.input_list["All"]["file_names"]
+                           and self.file_options_var.get() != "All"):
+                            self.input_list[self.file_options_var.get()]["set_columns"].pop(file, None)
                         else:
-                            with open(outputDirectory + "phaseLog.csv", "w") as phaseWriter:
-                                phaseList = list()
-                                for listIndex in range(len(minimumPhaseList)):
-                                    insideMinimumPhaseList = minimumPhaseList[listIndex].split("\n")
-                                    insideMaximumPhaseList = maximumPhaseList[listIndex].split("\n")
-                                    mergedLists = list(itertools.zip_longest(insideMinimumPhaseList,
-                                                                             insideMaximumPhaseList,
-                                                                             fillvalue=";--;--"))
-                                    for mergedList in mergedLists:
-                                        phaseList.append(";;".join(mergedList))
+                            if(self.file_options_var.get() == "All"):
+                                self.input_list.pop(file, None)
+                            else:
+                                self.input_list["All"]["file_names"].remove(file)
+                                self.input_list["All"]["set_columns"].pop(file, None)
 
-                                phaseWriter.write("Minima;;;;Maxima\nSample;Phase [h];milliVolt [mV];;Sample;" +
-                                "Phase [h];milliVolt [mV]\n" + "\n".join(phaseList))
-                                del phaseList[:]
+                            for entry in reversed(list(self.input_list.keys())):
+                                if(not entry in self.input_list["All"]["file_names"]
+                                   and file in self.input_list[entry]["file_names"]):
+                                    self.input_list[entry]["file_names"].remove(file)
+                                    self.input_list[entry]["set_columns"].pop(file, None)
+                                    if(not len(self.input_list[entry]["file_names"])):
+                                        self.input_list.pop(entry, None)
 
-                            with open(outputDirectory + "periodLog.csv", "w") as periodWriter:
-                                periodList = list()
-                                for listIndex in range(len(minimumPeriodList)):
-                                    insideMinimumPeriodList = minimumPeriodList[listIndex].split(";")
-                                    insideMaximumPeriodList = maximumPeriodList[listIndex].split(";")
-                                    periodList.append(";".join(insideMinimumPeriodList) + ";;" +
-                                                      ";"*(maxMinimumPeriodLength-len(insideMinimumPeriodList)) +
-                                                      ";".join(insideMaximumPeriodList))
+                all_deleted = False
+                if(not len(self.input_list[self.file_options_var.get()]["file_names"])):
+                    if(self.file_options_var.get() != "All"):
+                        self.input_list.pop(self.file_options_var.get(), None)
+                        file_list = ["Files"] + list(self.input_list.keys())
+                        self.file_options.set_menu(*file_list)
+                        self.file_options_var.set("All")
 
-                                periodWriter.write("Minima;;" + ";"*(maxMinimumPeriodLength-1) +
-                                                   "Maxima\nSample;Period [h];" + ";"*(maxMinimumPeriodLength-1) +
-                                                   "Sample;Period [h]\n" + "\n".join(periodList))
-                                del periodList[:]
-                    except PermissionError:
-                        app.warningBox("Output file warning!", "The output file 'phaseLog.csv' or 'periodLog.csv'" +
-                                       " is not accessible! Please make sure that they are closed and restart" +
-                                       " the analysis!")
-                        shutil.rmtree(outputDirectory + "tmp", ignore_errors=True)
-                        shutil.rmtree(outputDirectory + "tmpCompare", ignore_errors=True)
-                        enableMenus()
-                        return
+                if(not len(self.input_list["All"]["file_names"])):
+                        self.file_options.set_menu(*["Files"])
+                        self.file_options.configure(state="disabled")
+                        self.file.entryconfig("Compare files", state="disabled")
+                        self.file.entryconfig("Remove compared files", state="disabled")
+                        self.menu.entryconfig("PisA analysis", state="disabled")
+                        all_deleted = True
+                        for child in self.info_frame.winfo_children():
+                            child.pack_forget()
+                else:
+                    file_list = ["Files"] + list(self.input_list.keys())
+                    self.file_options.set_menu(*file_list)
+                    self.file_options_var.set("All")
 
-                    with open(outputDirectory + "plotLog.txt", "w") as logWriter:
-                        if(dataNumber == 0):
-                            dataNumber = "All"
-                        if(minutePoint == -1):
-                            minutePoint = "None"
+                if(not all_deleted):
+                    self.checkComparedColumns()
 
-                        space = len("[Amplitude percentage %]")
-                        logList = list()
-                        logList.append("[Datasheet file]" + " "*(space-len("[Datasheet file]")) + "\t" + datasheet)
-                        logList.append("[Output directory]" + " "*(space-len("[Output directory]")) + "\t" +
-                                       outputDirectory)
-                        logList.append("[Header]" + " "*(space-len("[Header]")) + "\t" + str(header))
-                        logList.append("[Plot point size]" + " "*(space-len("[Plot point size]")) + "\t" +
-                                       str(pointSize))
-                        logList.append("[X-axis label]" + " "*(space-len("[X-axis label]")) + "\t" + label)
-                        logList.append("[Period]" + " "*(space-len("[Period]")) + "\t" + period)
-                        logList.append("[Starting point]" + " "*(space-len("[Starting point]")) +
-                                       "\t" + str(startingPoint))
-                        logList.append("[Data number]" + " "*(space-len("[Data number]")) + "\t" +
-                                       str(dataNumber))
-                        logList.append("[Minute point]" + " "*(space-len("[Minute point]")) +
-                                       "\t" + str(minutePoint))
-                        logList.append("[Minimum]")
-                        logList.append("  [Exclude first day]" + " "*(space-len("  [Exclude first day]")) + "\t" +
-                                       str(minFirstDay))
-                        logList.append("  [Exclude last day]" + " "*(space-len("  [Exclude last day]")) + "\t" +
-                                       str(minLastDay))
-                        logList.append("[Maximum]")
-                        logList.append("  [Exclude first day]" + " "*(space-len("  [Exclude first day]")) + "\t" +
-                                       str(maxFirstDay))
-                        logList.append("  [Exclude last day]" + " "*(space-len("  [Exclude last day]")) + "\t" +
-                                       str(maxLastDay))
-                        logList.append("[Peak-Valley-Points]" + " "*(space-len("[Peak-Valley-Points]")) + "\t" +
-                                       str(points))
-                        logList.append("[Amplitude percentage %]" + " "*(space-len("[Amplitude percentage %]")) + "\t" +
-                                       str(amplitudePercentage))
-                        logList.append("[SG-Filter On]" + " "*(space-len("[SG-Filter]")) + "\t" + str(sgFilter))
-                        logList.append("  [Window size]" + " "*(space-len("[Window size]")) + "\t" + str(windowSize))
-                        logList.append("  [Polynomial order]" + " "*(space-len("[Polynomial order]")) + "\t" +
-                                       str(polyOrder))
-                        logList.append("[Threads]" + " "*(space-len("[Threads]")) + "\t" + str(threads))
-                        if(len(comparePlots)):
-                             logList.append("[Compared plots]" + " "*(space-len("[Compared plots]")) + "\n  " +
-                                            "\n  ".join(comparePlots))
+                self.closeWindow(self.remove_files_window)
 
-                        logWriter.write("\n".join(logList))
+        def removeColumns(self, columns):
+            if(len(columns)):
+                deleted_list = []
+                for file,data in columns.items():
+                    deleted = False
+                    column_list = self.input_list[self.file_options_var.get()]["set_columns"]
+                    for col,val in data.items():
+                        if(val.get()):
+                            column_list[file].remove(col)
+                            if(not len(column_list[file])):
+                                column_list.pop(file, None)
+                                deleted =True
 
-                    del minimumPhaseList[:]
-                    del maximumPhaseList[:]
-                    del minimumPeriodList[:]
-                    del maximumPeriodList[:]
-                    app.setStatusbar("Analysis finished")
-                    shutil.rmtree(outputDirectory + "tmp", ignore_errors=True)
-                    shutil.rmtree(outputDirectory + "tmpCompare", ignore_errors=True)
-                    if(os.name == "nt"):
-                        os.startfile(outputDirectory)
+                    deleted_list.append(deleted)
+
+                self.showComparisons()
+                self.closeWindow(self.remove_columns_window)
+                if(all(deleted_list)):
+                    self.pisa.entryconfig("Remove compared columns", state="disabled")
+
+        def showComparisons(self):
+            for child in self.info_frame.winfo_children():
+                child.pack_forget()
+
+            frame = tk.Frame(self.info_frame)
+            label_frame = tk.Frame(frame)
+            label_text = tk.StringVar()
+            label_text.set("Compared files:")
+            tk.Label(label_frame, textvariable=label_text, height=2).pack(side="left")
+            label_frame.pack(fill="both", expand=1)
+            list_frame = tk.Frame(frame)
+            files = self.input_list[self.file_options_var.get()]["file_names"]
+            for file in files:
+                file_frame = tk.Frame(list_frame)
+                file_text = tk.StringVar()
+                file_text.set("  " + file)
+                tk.Label(file_frame, textvariable=file_text).pack(side="left")
+                file_frame.pack(fill="both", expand=1)
+                columns = self.input_list[self.file_options_var.get()]["set_columns"]
+                if(file in columns):
+                    column_label_frame = tk.Frame(list_frame)
+                    label_column_text = tk.StringVar()
+                    label_column_text.set("   Compared columns:")
+                    tk.Label(column_label_frame, textvariable=label_column_text).pack(side="left")
+                    column_label_frame.pack(fill="both", expand=1)
+                    for column in columns[file]:
+                        col_frame = tk.Frame(list_frame)
+                        col_text = tk.StringVar()
+                        col_text.set("    -> " + column)
+                        tk.Label(col_frame, textvariable=col_text).pack(side="left")
+                        col_frame.pack(fill="both", expand=1)
+
+            list_frame.pack()
+            frame.pack(side="left")
+
+
+        def setGeneralSettings(self, point_size, starting_point, data_number, minute_point,
+                               period, minimum_exclude, maximum_exclude, x_label, sg_filter,
+                               set_settings):
+            global input_list
+            self.input_list[self.file_options_var.get()]["pointsize"] = point_size.get()
+            self.input_list[self.file_options_var.get()]["startingpoint"] = starting_point.get()
+            self.input_list[self.file_options_var.get()]["datanumber"] = data_number.get()
+            self.input_list[self.file_options_var.get()]["minutepoint"] = minute_point.get()
+            self.input_list[self.file_options_var.get()]["period"] = period.get()
+            self.input_list[self.file_options_var.get()]["minimum"]["exclude_firstday"] = minimum_exclude[0].get()
+            self.input_list[self.file_options_var.get()]["minimum"]["exclude_lastday"] = minimum_exclude[1].get()
+            self.input_list[self.file_options_var.get()]["maximum"]["exclude_lastday"] = maximum_exclude[0].get()
+            self.input_list[self.file_options_var.get()]["maximum"]["exclude_lastday"] = maximum_exclude[1].get()
+            self.input_list[self.file_options_var.get()]["xlabel"] = x_label.get()
+            self.input_list[self.file_options_var.get()]["sg_filter"]["on"] = sg_filter.get()
+            self.input_list[self.file_options_var.get()]["set_settings"] = set_settings.get()
+            self.settings_window.destroy()
+
+        def setPlotColor(self, sg):
+            if(sg):
+                plot_color = tkcc.askcolor(initialcolor=self.input_list[self.file_options_var.get()]["sg_filter"]["color"],
+                                           title="SG-Plot color")[-1]
+                if(plot_color == None):
+                    plot_color = "#800000"
+
+                self.input_list[self.file_options_var.get()]["sg_filter"]["color"] = plot_color
+            else:
+                plot_color = tkcc.askcolor(initialcolor=self.input_list[self.file_options_var.get()]["color"],
+                                           title="Plot color")[-1]
+                if(plot_color == None):
+                    plot_color = "#000000"
+
+                self.input_list[self.file_options_var.get()]["color"] = plot_color
+
+        def setAdvancedSettings(self, peak_valley_points, peak_valley_percentage, sg_window_size, sg_poly_order):
+            self.input_list[self.file_options_var.get()]["pv_points"] = peak_valley_points.get()
+            self.input_list[self.file_options_var.get()]["pv_amp_per"] = peak_valley_percentage.get()
+            self.input_list[self.file_options_var.get()]["sg_filter"]["window"] = sg_window_size.get()
+            self.input_list[self.file_options_var.get()]["sg_filter"]["poly"] = sg_poly_order.get()
+            self.advanced_settings_window.destroy()
+
+        def checkComparedColumns(self):
+            if(len(self.input_list[self.file_options_var.get()]["set_columns"])):
+                self.pisa.entryconfig("Remove compared columns", state="normal")
+            else:
+                self.pisa.entryconfig("Remove compared columns", state="disabled")
+
+            self.showComparisons()
+
+        def getLogStats(self, group_name):
+            self.log_list.append("#<---------- file/group " + group_name + " ---------->")
+            for attribute,value in self.input_list[group_name].items():
+                if(not attribute in ["data", "timepoint_indices"]):
+                    if(isinstance(value, list)):
+                        self.log_list.append("[" + attribute + "]\t" + ";".join(value))
+                    elif(attribute == "set_columns" and len(self.input_list[self.file_options_var.get()][attribute])):
+                        column_list = []
+                        for file,columns in self.input_list[self.file_options_var.get()][attribute].items():
+                            column_list.append(file + "=" + "-".join(columns))
+
+                        self.log_list.append(";".join(column_list))
                     else:
-                        subprocess.call(["xdg-open", outputDirectory])
-
-                enableMenus()
-                if(cancelAnalysis):
-                    app.setStatusbar("Analysis canceled")
-                    shutil.rmtree(outputDirectory + "tmp", ignore_errors=True)
-                    shutil.rmtree(outputDirectory + "tmpCompare", ignore_errors=True)
-
-                cancelAnalysis = False
-            except Exception:
-                app.setStatusbar("Analysis error")
-                app.warningBox("Unexpected error!", "An unexpected error occurred! Please check the error" +
-                               " message in the second window and retry!")
-                app.errorBox("Unexpected error!", traceback.format_exc())
-                enableMenus()
-                if(os.path.exists(outputDirectory + "tmp")):
-                    shutil.rmtree(outputDirectory + "tmp", ignore_errors=True)
-
-                if(os.path.exists(outputDirectory + "tmpCompare")):
-                    shutil.rmtree(outputDirectory + "tmpCompare", ignore_errors=True)
-
-                cancelAnalysis = False
-
-        if(button == "Cancel analysis"):
-            cancelAnalysis = True
-
-        if(button == "Compare columns"):
-            app.showSubWindow("Compare columns")
-
-        if(button == "Remove comparing columns"):
-            app.showSubWindow("Remove comparing columns")
-
-        if(button == "PisA Settings"):
-            app.showSubWindow("Analysis settings")
-
-
-
-    def columnsPress(button):
-
-        global comparePlots
-
-        if(button == "CompareSet"):
-            checkBoxes = app.getAllCheckBoxes()
-            checklist = list()
-            for check in columnNames:
-                if(checkBoxes[check]):
-                    checklist.append(check)
-                    app.setCheckBox(check, ticked=False, callFunction=False)
-
-            if(len(checklist)):
-                app.enableMenuItem("PisA", "Remove comparing columns")
-                checkPlots = " - ".join(checklist)
-                if(not checkPlots in comparePlots):
-                    comparePlots.append(checkPlots)
-                    app.addListItem("Removable plots", checkPlots)
-                    app.setLabel("Plots", " Comparing plots:\n  " + "\n  ".join(comparePlots))
-
-            del checklist[:]
-
-        if(button == "CompareClose"):
-            checkBoxes = app.getAllCheckBoxes()
-            for check in columnNames:
-                if(checkBoxes[check]):
-                    app.setCheckBox(check, ticked=False, callFunction=False)
-
-            app.hideSubWindow("Compare columns")
-
-        if(button == "RemoveOk"):
-            removePlots = app.getAllListItems("Removing plots")
-            for plot in removePlots:
-                comparePlots.remove(plot)
-                app.removeListItem("Removing plots", plot)
-
-            if(len(comparePlots)):
-                app.setLabel("Plots", " Comparing plots:\n  " + "\n  ".join(comparePlots))
-            else:
-                app.setLabel("Plots", " Comparing plots:\n  None")
-                app.disableMenuItem("PisA", "Remove comparing columns")
-
-            app.hideSubWindow("Remove comparing columns")
-
-        if(button == "RemoveCancel"):
-            removePlots = app.getAllListItems("Removing plots")
-            for plot in removePlots:
-                app.addListItem("Removable plots", plot)
-                app.removeListItem("Removing plots", plot)
-
-            app.hideSubWindow("Remove comparing columns")
-
-
-
-    def doubleClickAdd():
-
-        lbcPlot = lbc.get(ACTIVE)
-        if(len(lbcPlot)):
-            app.addListItem("Removing plots", lbcPlot)
-            app.removeListItem("Removable plots", lbcPlot)
-
-
-
-    def doubleClickRemove():
-
-        lbrPlot = lbr.get(ACTIVE)
-        if(len(lbrPlot)):
-            app.addListItem("Removable plots", lbrPlot)
-            app.removeListItem("Removing plots", lbrPlot)
-
-
-
-    def analysisSettingsPress(button):
-
-        global plotColor
-        global sgPlotColor
-
-        if(button == "AnalysisOk"):
-            app.confirmHideSubWindow("Analysis settings")
-
-        if(button == "AnalysisAdvanced"):
-            app.showSubWindow("Advanced settings")
-
-        if(button == "PlotColor"):
-            plotColor = app.colourBox(colour=plotColor)
-
-        if(button == "SGPlotColor"):
-            sgPlotColor = app.colourBox(colour=sgPlotColor)
-
-        if(button == "AnalysisReset"):
-            app.setScale(" Plot point size ", 3, callFunction=False)
-            plotColor = "#000000"
-            app.setEntry(" Starting point ", 12)
-            app.setScale(" Data number ", 5, callFunction=False)
-            app.setScale(" Data minute point ", -1, callFunction=False)
-            app.setCheckBox(" Exclude first Day [min]", ticked=False, callFunction=False)
-            app.setCheckBox(" Exclude last Day [min]", ticked=True, callFunction=False)
-            app.setCheckBox(" Exclude first Day [max]", ticked=True, callFunction=False)
-            app.setCheckBox(" Exclude last Day [max]", ticked=False, callFunction=False)
-            app.setRadioButton("Label", "Days", callFunction=False)
-            app.setCheckBox(" SG-Filter On", ticked=False, callFunction=False)
-            sgPlotColor = "#800000"
-
-
-    def advancedSettingsPress(button):
-
-        if(button == "AdvancedOk"):
-            app.hideSubWindow("Advanced settings")
-
-        if(button == "AdvancedReset"):
-            app.setSpinBox(" Points ", 1)
-            app.setEntry(" Amplitude percentage %", 3)
-            app.setEntry(" Window size ", 11)
-            app.setEntry(" Poly order ", 3)
-            if(os.name == "nt"):
-                app.setSpinBox(" Thread number ", 1, callFunction=False)
-            else:
-                app.setSpinBox(" Thread number ", mp.cpu_count(), callFunction=False)
-
-
-
-    def fileSettingsPress(button):
-
-        global header
-
-        if(button == "Header"):
-            app.showSubWindow("Header settings")
-
-        if(button == "HeaderOk"):
-            app.hideSubWindow("Header settings")
-
-        if(button == "HeaderCancel"):
-            app.hideSubWindow("Header settings")
-            app.setEntry(" Header line ", header)
-
-        if(button == "Reset settings"):
-            header = 1
-            app.setEntry(" Header line ", header)
-
-
-
-    def exitPress(button):
-
-        global exitApp
-
-        if(button == "Exit PisA"):
-            exitApp = True
-            app.stop()
-
-
-
-    def enableMenus():
-
-        app.enableMenuItem("File", "Open")
-        app.enableMenuItem("File", "Save")
-        app.enableMenuItem("PisA", "Start analysis")
-        app.disableMenuItem("PisA", "Cancel analysis")
-        app.enableMenuItem("PisA", "Compare columns")
-        app.enableMenuItem("PisA", "Set period")
-        app.enableMenuItem("PisA", "PisA Settings")
-        app.enableMenuItem("Settings", "Header")
-        app.enableMenuItem("Settings", "Reset settings")
-        app.enableMenuItem("Exit", "Exit PisA")
-        if(len(comparePlots)):
-            app.enableMenuItem("PisA", "Remove comparing columns")
-
-
-
-    def startSingleThreaded_PlotData(columnNames, progress, lock, data, datasheet, outputDirectory, dataNumber, informationOfTime,
-                                  timePointIndices, plotColor, minFirstDay, minLastDay, maxFirstDay, maxLastDay, points, amplitudePercentage,
-                                  sgFilter, sgPlotColor, windowSize, polyOrder, period, startingPoint, pointSize, label):
-
-        global pages
-
-        pages = list()
-        for sample in columnNames:
-            pageResult = phototaxisPlotter.plotData(sample=sample, progress=progress, lock=lock, data=data,
-                                                    datasheet=datasheet, outputDirectory=outputDirectory, dataNumber=dataNumber,
-                                                    informationOfTime=informationOfTime, timePointIndices=timePointIndices,
-                                                    plotColor=plotColor, minFirstDay=minFirstDay, minLastDay=minLastDay, maxFirstDay=maxFirstDay,
-                                                    maxLastDay=maxLastDay, points=points, amplitudePercentage=amplitudePercentage,
-                                                    sgFilter=sgFilter, sgPlotColor=sgPlotColor, windowSize=windowSize, polyOrder=polyOrder,
-                                                    period=period, startingPoint=startingPoint, pointSize=pointSize, label=label)
-
-            pages.append(pageResult)
-
-
-
-    def startSingleThreaded_PlotComparePlots(comparePlots, progress, lock, plotList, datasheet, outputDirectory,
-                                          informationOfTime, pointSize, label):
-
-        global compareResults
-
-        compareResults = list()
-        for sampleList in comparePlots:
-            pageCompareResult = phototaxisPlotter.plotComparePlots(sampleList=sampleList, progress=progress, lock=lock, plotList=pages,
-                                                                   datasheet=datasheet, outputDirectory=outputDirectory,
-                                                                   informationOfTime=informationOfTime, pointSize=pointSize, label=label)
-
-            compareResults.append(pageCompareResult)
-
-
-
+                        self.log_list.append("[" + attribute + "]\t" + str(value))
+
+
+        def closeWindow(self, window):
+            window.destroy()
+
+        def cancelAnalysis(self):
+            self.cancel_analysis = True
+
+        def closeApplication(self):
+            exit()
+
+        def enableMenus(self):
+            self.menu.entryconfig("Files", state="normal")
+            self.pisa.entryconfig("Start analysis", state="normal")
+            self.pisa.entryconfig("Cancel analysis", state="disabled")
+            self.pisa.entryconfig("Compare columns", state="normal")
+            self.pisa.entryconfig("Remove compared columns", state="normal")
+            self.pisa.entryconfig("Settings", state="normal")
+            self.menu.entryconfig("Exit", state="normal")
+
+        def disableMenus(self):
+            self.menu.entryconfig("Files", state="disabled")
+            self.pisa.entryconfig("Start analysis", state="disabled")
+            self.pisa.entryconfig("Cancel analysis", state="normal")
+            self.pisa.entryconfig("Compare columns", state="disabled")
+            self.pisa.entryconfig("Remove compared columns", state="disabled")
+            self.pisa.entryconfig("Settings", state="disabled")
+            self.menu.entryconfig("Exit", state="disabled")
+
+        def buildLabelSpinbox(self, parent_frame, text, value, increment, height):
+            frame = tk.Frame(parent_frame)
+            label_text = tk.StringVar()
+            label_text.set(text)
+            tk.Label(frame, textvariable=label_text, height=height).pack(side="left")
+            label_spinbox = tk.DoubleVar()
+            label_spinbox.set(value)
+            tk.Spinbox(frame, from_=0, to=10**6, textvariable=label_spinbox, increment=increment).pack(side="left")
+            frame.pack()
+            return label_spinbox
+
+        def buildLabelScale(self, parent_frame, text, value, min, max):
+            frame = tk.Frame(parent_frame)
+            label_text = tk.StringVar()
+            label_text.set(text)
+            tk.Label(frame, textvariable=label_text, height=4).pack(side="left")
+            label_scale = tk.Scale(frame, from_=min, to=max, orient="horizontal", relief="groove")
+            label_scale.set(value)
+            label_scale.pack(side="left")
+            frame.pack()
+            return label_scale
+
+        def buildExcludeField(self, parent_frame, title, first_label, first_value, second_label, second_value):
+            frame = tk.LabelFrame(parent_frame, text=title, borderwidth=2, relief="groove")
+            first_var = tk.BooleanVar()
+            first_var.set(first_value)
+            tk.Checkbutton(frame, text=first_label, var=first_var).pack(side="left", padx=15)
+            second_var = tk.BooleanVar()
+            second_var.set(second_value)
+            tk.Checkbutton(frame, text=second_label, var=second_var).pack(side="left")
+            frame.pack(fill="both", expand=1, pady=5)
+            return [first_var, second_var]
+
+        def configureScrollbar(self, event):
+            self.canvas.configure(scrollregion=self.canvas.bbox("all"))
 
     try:
-        manager = mp.Manager()
-        progress = manager.Value("i", 0)
-        lock = manager.Lock()
-        buildAppJarGUI()
-        app.go()
-        while(not exitApp):
-            mainloop() #tkinter
+        root = tk.Tk()
+        root.geometry("380x400")
+        Application(root)
+        root.mainloop()
     except Exception:
-        app.errorBox("Critical error!", traceback.format_exc())
-        with open(outputDirectory + "errorLog.txt", "w") as logWriter:
-            logWriter.write(traceback.format_exc())
+        messagebox.showerror("Critical error", "A critical error occurred while executing the program. See the message below for more details:\n\n"
+                             + traceback.format_exc())
