@@ -277,7 +277,6 @@ def plotData(selected_group, input_list, highest_columns_index, progress, lock):
 
 
 def findPeaksAndValleys(y, points):
-
     valleys = []
     peaks = []
     if(len(y) > points*2):
@@ -305,7 +304,6 @@ def findPeaksAndValleys(y, points):
 
 
 def calculatePeakAndValleyMean(x, y, point, threshold, mode):
-
     value_list = []
     index_list = []
     left_y = y[:point+1]

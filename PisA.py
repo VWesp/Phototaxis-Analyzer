@@ -686,7 +686,7 @@ if __name__ == "__main__":
             self.pisa.entryconfig("Compare columns", state="normal")
             if(len(self.input_list[self.file_options_var.get()]["set_columns"])):
                 self.pisa.entryconfig("Remove compared columns", state="normal")
-                
+
             self.pisa.entryconfig("Settings", state="normal")
             self.menu.entryconfig("Exit", state="normal")
 
@@ -756,7 +756,7 @@ if __name__ == "__main__":
             tk.Button(button_frame, text="Ok", command=self.error_window.destroy).pack(side="left", padx=50)
             self.button_var = tk.StringVar()
             self.button_var.set("Show details")
-            tk.Button(button_frame, textvariable=self.button_var, command=self.showHideDetailes).pack(side="left", padx=50)
+            tk.Button(button_frame, textvariable=self.button_var, command=self.showHideDetails).pack(side="left", padx=50)
             button_frame.pack(fill="both", expand=1, pady=5)
 
             detailed_error_scrollbar = tk.Scrollbar(self.detailed_error_frame)
@@ -770,7 +770,7 @@ if __name__ == "__main__":
             detailed_error_area.config(yscrollcommand=detailed_error_scrollbar.set)
             self.detailed_error_frame.pack_forget()
 
-        def showHideDetailes(self):
+        def showHideDetails(self):
             if(self.button_var.get() == "Show details"):
                 self.detailed_error_frame.pack()
                 self.button_var.set("Hide details")
