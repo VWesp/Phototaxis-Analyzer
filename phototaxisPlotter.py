@@ -97,8 +97,8 @@ def plotData(selected_group, input_list, highest_columns_index, progress, lock):
                 maximum_period_list = []
                 maximum_phase_list = []
                 for day in hours:
-                    day_start = day - (2 * points)
-                    day_end = day + (22 + (2 * points))
+                    day_start = (day + (input_list[settings]["startingpoint"] % 2)) - (2 * points)
+                    day_end = (day + (input_list[settings]["startingpoint"] % 2)) + (22 + (2 * points))
                     if(day == 0):
                         day_start = input_list[settings]["startingpoint"]
                     else:

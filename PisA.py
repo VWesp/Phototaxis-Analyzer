@@ -202,7 +202,7 @@ if __name__ == "__main__":
                 with open(self.input_list[self.file_options_var.get()]["output"] + "log.txt", "w") as log_writer:
                     log_writer.write("#Log file of group: " + self.file_options_var.get() + "\n" + "\n".join(self.log_list))
             elif(not self.cancel_analysis and error):
-                messagebox.showErrorWindow("Analysis error", "An error occurred while running the analysis.",
+                self.showErrorWindow("Analysis error", "An error occurred while running the analysis.",
                                             single_plots_pdf.get()[0])
                 error = False
             elif(self.cancel_analysis):
@@ -684,7 +684,9 @@ if __name__ == "__main__":
             self.pisa.entryconfig("Start analysis", state="normal")
             self.pisa.entryconfig("Cancel analysis", state="disabled")
             self.pisa.entryconfig("Compare columns", state="normal")
-            self.pisa.entryconfig("Remove compared columns", state="normal")
+            if(len(self.input_list[self.file_options_var.get()]["set_columns"])):
+                self.pisa.entryconfig("Remove compared columns", state="normal")
+                
             self.pisa.entryconfig("Settings", state="normal")
             self.menu.entryconfig("Exit", state="normal")
 

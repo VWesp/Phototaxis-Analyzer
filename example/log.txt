@@ -4,7 +4,7 @@
 [path]	/home/valentin/git/Phototaxis-Analyzer/example/PhT64_32_2019-04-30_11-09-59.txt
 [output]	/home/valentin/git/Phototaxis-Analyzer/example/
 [pointsize]	3
-[startingpoint]	12
+[startingpoint]	12.0
 [datanumber]	5
 [minutepoint]	-1
 [period]	Both
@@ -12,10 +12,10 @@
 [minimum]	{'exclude_firstday': False, 'exclude_lastday': True}
 [maximum]	{'exclude_firstday': True, 'exclude_lastday': False}
 [xlabel]	Days
-[sg_filter]	{'on': False, 'window': 11, 'poly': 3, 'color': '#800000'}
+[sg_filter]	{'on': True, 'window': 11, 'poly': 3, 'color': '#800000'}
 [pv_points]	1
 [pv_amp_per]	3
-PhT64_32_2019-04-30_11-09-59.txt=0 :=: 1 - 2 - 12 - 13 - 24-1 :=: 9 - 16 - 17 - 25
+[set_columns]	{}
 [set_settings]	False
 [data_per_measurement]	40
 [data_minutepoints]	19
