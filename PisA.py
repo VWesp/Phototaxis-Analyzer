@@ -644,10 +644,10 @@ if __name__ == "__main__":
                 self.input_list[self.file_options_var.get()]["color"] = plot_color
 
         def setAdvancedSettings(self, peak_valley_points, peak_valley_percentage, sg_window_size, sg_poly_order):
-            self.input_list[self.file_options_var.get()]["pv_points"] = peak_valley_points.get()
+            self.input_list[self.file_options_var.get()]["pv_points"] = int(peak_valley_points.get())
             self.input_list[self.file_options_var.get()]["pv_amp_per"] = peak_valley_percentage.get()
-            self.input_list[self.file_options_var.get()]["sg_filter"]["window"] = sg_window_size.get()
-            self.input_list[self.file_options_var.get()]["sg_filter"]["poly"] = sg_poly_order.get()
+            self.input_list[self.file_options_var.get()]["sg_filter"]["window"] = int(sg_window_size.get())
+            self.input_list[self.file_options_var.get()]["sg_filter"]["poly"] = int(sg_poly_order.get())
             self.advanced_settings_window.destroy()
 
         def checkComparedColumns(self):
