@@ -13,7 +13,6 @@ if __name__ == "__main__":
     from functools import partial
     import subprocess
     import traceback
-    import time
 
 
     class LoadingScreen(tk.Toplevel):
@@ -52,7 +51,6 @@ if __name__ == "__main__":
                                       "set_settings": False}
             tk.Frame.__init__(self, master)
             loading_screen = LoadingScreen(self)
-            time.sleep(5)
             self.master = master
             self.manager = mp.Manager()
             self.progress = self.manager.Value("i", 0.0)
