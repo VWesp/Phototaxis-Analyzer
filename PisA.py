@@ -3,6 +3,7 @@ if __name__ == "__main__":
     mp.freeze_support()
     import tkinter as tk
     from tkinter import ttk, filedialog, messagebox
+    from PIL import ImageTk, Image
     import tkinter.colorchooser as tkcc
     import os
     import sys
@@ -12,11 +13,33 @@ if __name__ == "__main__":
     from functools import partial
     import subprocess
     import traceback
+    import time
+
+
+    class LoadingScreen(tk.Toplevel):
+
+        def __init__(self, parent):
+            tk.Toplevel.__init__(self, parent)
+            self.resizable(False, False)
+            self.title("Loading screen")
+            try:
+                loading_image = ImageTk.PhotoImage(Image.open("../../icon/loading_sun.png"))
+                tk.Label(self, image=loading_image).pack(side="bottom", fill="both", expand="yes")
+            except:
+                self.geometry("210x210")
+                loading_text = tk.StringVar()
+                loading_text.set("<Unable\n\nto display\n\nloading image!>\n\nLoading\napplication...")
+                label = tk.Label(self, textvariable=loading_text)
+                label.config(font=("Courier", 18))
+                label.pack(side="bottom", fill="both", expand="yes")
+
+            self.update()
 
 
     class Application(tk.Frame):
 
         def __init__(self, master=None):
+
             self.input_list = {}
             self.input_list["All"] = {"file_names": [], "path": [], "output": None, "pointsize": 3, "startingpoint": 12,
                                       "datanumber": 5, "minutepoint": -1, "period": "Both", "color": "#000000",
@@ -28,6 +51,8 @@ if __name__ == "__main__":
                                       "data_minutepoints": sys.maxsize,"set_columns": {},
                                       "set_settings": False}
             tk.Frame.__init__(self, master)
+            loading_screen = LoadingScreen(self)
+            time.sleep(5)
             self.master = master
             self.manager = mp.Manager()
             self.progress = self.manager.Value("i", 0.0)
@@ -36,6 +61,7 @@ if __name__ == "__main__":
             self.columns_index_list = {"All": 0}
             self.cancel_analysis = False
             self.initWindow()
+            loading_screen.destroy()
 
         def initWindow(self):
             self.progress_frame = tk.LabelFrame(self, text="Analysis progress", borderwidth=2, relief="groove")
@@ -780,8 +806,10 @@ if __name__ == "__main__":
 
     try:
         root = tk.Tk()
+        root.withdraw()
         root.geometry("380x400")
         Application(root)
+        root.deiconify()
         root.mainloop()
     except Exception:
         messagebox.showerror("Critical error", "A critical error occurred while executing the program. See the message below for more details:\n\n"
