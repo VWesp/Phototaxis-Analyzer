@@ -789,7 +789,7 @@ if __name__ == "__main__":
                         for file,columns in self.input_list[self.file_options_var.get()][attribute].items():
                             column_list.append(file + "=" + "-".join(columns))
 
-                        self.log_list.append(";".join(column_list))
+                        self.log_list.append("[" + attribute + "]\t" +";".join(column_list))
                     else:
                         self.log_list.append("[" + attribute + "]\t" + str(value))
 
