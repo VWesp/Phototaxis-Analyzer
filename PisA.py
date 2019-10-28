@@ -22,7 +22,12 @@ if __name__ == "__main__":
             self.resizable(False, False)
             self.title("Loading screen")
             try:
-                loading_image = ImageTk.PhotoImage(Image.open("../../icon/loading_sun.png"))
+                loading_image = None
+                try:
+                    loading_image = ImageTk.PhotoImage(Image.open("../../icon/loading_sun.png"))
+                except:
+                    loading_image = root.iconbitmap("icon/loading_sun.png")
+
                 tk.Label(self, image=loading_image).pack(side="bottom", fill="both", expand="yes")
             except:
                 self.geometry("210x210")
@@ -912,7 +917,11 @@ if __name__ == "__main__":
         root = tk.Tk()
         root.withdraw()
         root.geometry("380x400")
-        root.iconbitmap("icon/leaning-tower-of-pisa.ico")
+        try:
+            root.iconbitmap("../../icon/leaning-tower-of-pisa.ico")
+        except:
+            root.iconbitmap("icon/leaning-tower-of-pisa.ico")
+
         root.style = ttk.Style()
         root.style.theme_use("clam")
         root.style.configure("green.Horizontal.TProgressbar", foreground="green", background="green")
