@@ -75,22 +75,31 @@ if __name__ == "__main__":
             self.file_options_var = tk.StringVar()
             self.file_options_var.set("Files")
             self.file_options = ttk.OptionMenu(self.file_options_frame, self.file_options_var, *["Files"],
-                                               self.checkComparedColumns)
+                                               command=self.checkComparedColumns)
             self.file_options.pack()
             self.file_options.configure(state="disabled")
             self.file_options_frame.pack()
             self.header_line = self.buildLabelSpinbox(self.files_frame, "Set header line of file", 1, 1, 2)
             self.files_frame.pack(fill="both", expand=0)
 
+            self.status_frame = tk.Frame(self, borderwidth=2, relief="groove")
+            self.status_var = tk.StringVar()
+            self.status_var.set("Status:")
+            tk.Label(self.status_frame, textvariable=self.status_var).pack(side="left")
+            self.status_frame.pack(fill="both", expand=0)
+
             self.canvas = tk.Canvas(self, borderwidth=3, relief="sunken")
             self.info_frame = tk.LabelFrame(self.canvas, borderwidth=0)
-            self.info_scrollbar = tk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
-            self.canvas.configure(yscrollcommand=self.info_scrollbar.set, scrollregion=self.canvas.bbox("all"))
-            self.info_scrollbar.pack(side="right", fill="y")
+            self.x_scrollbar = tk.Scrollbar(self, orient="horizontal", command=self.canvas.xview)
+            self.canvas.configure(xscrollcommand=self.x_scrollbar.set, scrollregion=self.canvas.bbox("all"))
+            self.x_scrollbar.pack(side="bottom", fill="x")
+            self.y_scrollbar = tk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
+            self.canvas.configure(yscrollcommand=self.y_scrollbar.set, scrollregion=self.canvas.bbox("all"))
+            self.y_scrollbar.pack(side="right", fill="y")
             self.info_frame.pack(fill="both", expand=1)
             self.canvas.pack(fill="both", expand=1)
             self.canvas.create_window((0,0), window=self.info_frame)
-            self.info_frame.bind("<Configure>", self.configureScrollbar)
+            self.info_frame.bind("<Configure>", self.configureMainScrollbar)
 
             self.menu = tk.Menu(self.master)
             self.master.config(menu=self.menu)
@@ -116,6 +125,7 @@ if __name__ == "__main__":
             self.exit = tk.Menu(self.menu, tearoff=0)
             self.exit.add_command(label="Exit PisA", command=self.closeApplication)
             self.menu.add_cascade(label="Exit", menu=self.exit)
+
 
         def openFile(self):
             file_name = None
@@ -171,6 +181,8 @@ if __name__ == "__main__":
                                     self.input_list["All"]["data_minutepoints"] = self.input_list[file_name]["data_minutepoints"]
 
                         self.input_list[file_name]["data"] = data
+                    else:
+                        messagebox.showerror("File loading error", "A file with the same name is already loaded.")
 
                     self.showComparisons()
             except Exception:
@@ -205,13 +217,20 @@ if __name__ == "__main__":
                     error = True
                     break
 
+                if(self.progress.value == 0):
+                    self.status_var.set("Status: Starting threads...")
+                else:
+                    self.status_var.set("Status: Analyzing...")
+
                 self.progressbar.set(self.progress.value * (100/progress_end))
                 self.update()
 
             self.progressbar.set(self.progress.value * (100/progress_end))
             pool.join()
+            self.status_var.set("Status: Analysis finished/stopped.")
             self.enableMenus()
             if(not self.cancel_analysis and not error):
+                self.status_var.set("Status: Analysis finished.")
                 if(os.name == "nt"):
                     os.startfile(self.input_list[self.file_options_var.get()]["output"])
                 else:
@@ -227,15 +246,23 @@ if __name__ == "__main__":
                 with open(self.input_list[self.file_options_var.get()]["output"] + "log.txt", "w") as log_writer:
                     log_writer.write("#Log file of group: " + self.file_options_var.get() + "\n" + "\n".join(self.log_list))
             elif(not self.cancel_analysis and error):
+                self.status_var.set("Status: Error during analysis.")
                 self.showErrorWindow("Analysis error", "An error occurred while running the analysis.",
                                      single_plots_pdf.get()[0], self.input_list[self.file_options_var.get()]["output"])
                 error = False
             elif(self.cancel_analysis):
+                self.status_var.set("Status: Analysis canceled.")
                 self.cancel_analysis = False
 
         def configureFilesWindow(self):
             self.files_window = tk.Toplevel(self)
             self.files_window.wm_title("Comparing files")
+
+            button_frame = tk.Frame(self.files_window)
+            tk.Button(button_frame, text="Set", command=lambda:
+                      self.setFiles(set_files, name)).pack(side="left", expand=1)
+            tk.Button(button_frame, text="Close", command=self.files_window.destroy).pack(side="left", expand=1)
+            button_frame.pack(fill="both", expand=1, pady=5)
 
             label_frame = tk.Frame(self.files_window)
             label_text = tk.StringVar()
@@ -257,17 +284,18 @@ if __name__ == "__main__":
 
             file_frame.pack()
 
-            button_frame = tk.Frame(self.files_window)
-            tk.Button(button_frame, text="Set", command=lambda:
-                      self.setFiles(set_files, name)).pack(side="left", expand=1)
-            tk.Button(button_frame, text="Close", command=self.files_window.destroy).pack(side="left", expand=1)
-            button_frame.pack(fill="both", expand=1, pady=5)
-
         def configureColumnWindow(self):
             self.column_window = tk.Toplevel(self)
             self.column_window.wm_title("Comparing columns")
 
-            column_frame = tk.LabelFrame(self.column_window, text="Columns", borderwidth=2, relief="groove")
+            button_frame = tk.Frame(self.column_window)
+            tk.Button(button_frame, text="Set", command=lambda:
+                      self.setColumns(set_column_data)).pack(side="left", expand=1)
+            tk.Button(button_frame, text="Close", command=self.column_window.destroy).pack(side="left", expand=1)
+            button_frame.pack(fill="both", expand=1, pady=5)
+
+            self.column_canvas = tk.Canvas(self.column_window)
+            column_frame = tk.LabelFrame(self.column_canvas, text="Columns", borderwidth=2, relief="groove")
             set_column_data = {}
             for data_index in self.input_list[self.file_options_var.get()]["file_names"]:
                 data_frame = tk.LabelFrame(column_frame, text=data_index, borderwidth=2, relief="groove")
@@ -285,19 +313,30 @@ if __name__ == "__main__":
                         row_frame.pack(fill="both", expand=1)
 
                 set_column_data[data_index] = set_columns
-                data_frame.pack(pady=5)
+                data_frame.pack(anchor="w", pady=5)
 
-            column_frame.pack()
-
-            button_frame = tk.Frame(self.column_window)
-            tk.Button(button_frame, text="Set", command=lambda:
-                      self.setColumns(set_column_data)).pack(side="left", expand=1)
-            tk.Button(button_frame, text="Close", command=self.column_window.destroy).pack(side="left", expand=1)
-            button_frame.pack(fill="both", expand=1, pady=5)
+            column_scrollbar = tk.Scrollbar(self.column_window, orient="vertical", command=self.column_canvas.yview)
+            self.column_canvas.configure(yscrollcommand=column_scrollbar.set, scrollregion=self.column_canvas.bbox("all"))
+            column_scrollbar.pack(side="right", fill="y")
+            column_frame.pack(fill="both", expand=1)
+            self.column_canvas.pack(fill="both", expand=1)
+            self.column_canvas.create_window((0,0), window=column_frame)
+            column_frame.bind("<Configure>", self.configureComparingColumnsScrollbar)
+            self.column_canvas.update()
+            self.column_canvas.yview_moveto(0)
+            width = 370 if column_frame.winfo_width()+20 > 370 else column_frame.winfo_width()+20
+            height = 210 if column_frame.winfo_height()+50 > 210 else column_frame.winfo_height()+50
+            self.column_window.geometry(str(width) + "x" + str(height))
 
         def configureRemoveFilesWindow(self):
             self.remove_files_window = tk.Toplevel(self)
             self.remove_files_window.wm_title("Remove set files")
+
+            button_frame = tk.Frame(self.remove_files_window)
+            tk.Button(button_frame, text="Set", command=lambda:
+                      self.removeFiles(set_files)).pack(side="left", expand=1)
+            tk.Button(button_frame, text="Close", command=self.remove_files_window.destroy).pack(side="left", expand=1)
+            button_frame.pack(fill="both", expand=1, pady=5)
 
             remove_frame = tk.LabelFrame(self.remove_files_window, text="Compared files",
                                          borderwidth=2, relief="groove")
@@ -312,17 +351,18 @@ if __name__ == "__main__":
 
             remove_frame.pack()
 
-            button_frame = tk.Frame(self.remove_files_window)
-            tk.Button(button_frame, text="Set", command=lambda:
-                      self.removeFiles(set_files)).pack(side="left", expand=1)
-            tk.Button(button_frame, text="Close", command=self.remove_files_window.destroy).pack(side="left", expand=1)
-            button_frame.pack(fill="both", expand=1, pady=5)
-
         def configureRemoveColumnsWindow(self):
             self.remove_columns_window = tk.Toplevel(self)
             self.remove_columns_window.wm_title("Remove set columns")
 
-            remove_frame = tk.LabelFrame(self.remove_columns_window, text="Compared columns",
+            button_frame = tk.Frame(self.remove_columns_window)
+            tk.Button(button_frame, text="Set", command=lambda:
+                      self.removeColumns(set_file_columns)).pack(side="left", expand=1)
+            tk.Button(button_frame, text="Close", command=self.remove_columns_window.destroy).pack(side="left", expand=1)
+            button_frame.pack(fill="both", expand=1, pady=5)
+
+            self.remove_canvas = tk.Canvas(self.remove_columns_window)
+            remove_frame = tk.LabelFrame(self.remove_canvas, text="Compared columns",
                                          borderwidth=2, relief="groove")
             files = list(self.input_list[self.file_options_var.get()]["set_columns"].keys())
             set_file_columns = {}
@@ -338,21 +378,43 @@ if __name__ == "__main__":
                     column_frame.pack(fill="both", expand=1)
 
                 set_file_columns[file] = set_columns
-                file_frame.pack(pady=5)
+                file_frame.pack(anchor="w", pady=5)
 
-            remove_frame.pack()
-
-            button_frame = tk.Frame(self.remove_columns_window)
-            tk.Button(button_frame, text="Set", command=lambda:
-                      self.removeColumns(set_file_columns)).pack(side="left", expand=1)
-            tk.Button(button_frame, text="Close", command=self.remove_columns_window.destroy).pack(side="left", expand=1)
-            button_frame.pack(fill="both", expand=1, pady=5)
+            remove_x_scrollbar = tk.Scrollbar(self.remove_columns_window, orient="horizontal", command=self.remove_canvas.xview)
+            self.remove_canvas.configure(yscrollcommand=remove_x_scrollbar.set, scrollregion=self.remove_canvas.bbox("all"))
+            remove_x_scrollbar.pack(side="bottom", fill="x")
+            remove_y_scrollbar = tk.Scrollbar(self.remove_columns_window, orient="vertical", command=self.remove_canvas.yview)
+            self.remove_canvas.configure(yscrollcommand=remove_y_scrollbar.set, scrollregion=self.remove_canvas.bbox("all"))
+            remove_y_scrollbar.pack(side="right", fill="y")
+            remove_frame.pack(fill="both", expand=1)
+            self.remove_canvas.pack(fill="both", expand=1)
+            self.remove_canvas.create_window((0,0), window=remove_frame)
+            remove_frame.bind("<Configure>", self.configureRemoveColumnsScrollbar)
+            self.remove_canvas.update()
+            self.remove_canvas.xview_moveto(0)
+            self.remove_canvas.yview_moveto(0)
+            width = 370 if remove_frame.winfo_width()+20 > 370 else remove_frame.winfo_width()+20
+            height = 210 if remove_frame.winfo_height()+50 > 210 else remove_frame.winfo_height()+50
+            self.remove_columns_window.geometry(str(width) + "x" + str(height))
 
         def configureSettings(self):
             self.settings_window = tk.Toplevel(self)
             self.settings_window.wm_title("Analysis settings")
 
-            self.general_settings_frame = tk.LabelFrame(self.settings_window, text="General settings",
+            button_frame = tk.Frame(self.settings_window)
+            tk.Button(button_frame, text="Ok", command=lambda:
+                      self.setGeneralSettings(point_size, starting_point, data_number, minute_point,
+                                              period, minimum_exclude, maximum_exclude, x_label, sg_filter,
+                                              set_settings)).pack(side="left", expand=1)
+            tk.Button(button_frame, text="Advanced",
+                      command=self.configureAdvancedSettings).pack(side="left", expand=1)
+            tk.Button(button_frame, text="Cancel",
+                      command=self.settings_window.destroy).pack(side="left", expand=1)
+            button_frame.pack(fill="both", expand=1, pady=5)
+
+            self.settings_canvas = tk.Canvas(self.settings_window)
+            self.settings_frame = tk.Frame(self.settings_canvas)
+            self.general_settings_frame = tk.LabelFrame(self.settings_frame, text="General settings",
                                                         borderwidth=2, relief="groove")
 
             period_frame = tk.Frame(self.general_settings_frame)
@@ -380,23 +442,23 @@ if __name__ == "__main__":
                       self.setPlotColor(False)).pack()
             self.general_settings_frame.pack(fill="both", expand=1)
 
-            minimum_exclude = self.buildExcludeField(self.settings_window, "Minimum", " Exclude first day",
+            minimum_exclude = self.buildExcludeField(self.settings_frame, "Minimum", " Exclude first day",
                                                      self.input_list[self.file_options_var.get()]["minimum"]["exclude_firstday"],
                                                      " Exclude last day",
                                                      self.input_list[self.file_options_var.get()]["minimum"]["exclude_lastday"])
-            maximum_exclude = self.buildExcludeField(self.settings_window, "Maximum", " Exclude first day",
+            maximum_exclude = self.buildExcludeField(self.settings_frame, "Maximum", " Exclude first day",
                                                      self.input_list[self.file_options_var.get()]["maximum"]["exclude_firstday"],
                                                      " Exclude last day",
                                                      self.input_list[self.file_options_var.get()]["maximum"]["exclude_lastday"])
 
-            x_label_frame = tk.LabelFrame(self.settings_window, text="X-axis label", borderwidth=2, relief="groove")
+            x_label_frame = tk.LabelFrame(self.settings_frame, text="X-axis label", borderwidth=2, relief="groove")
             x_label = tk.StringVar()
             tk.Radiobutton(x_label_frame, text="Days", variable=x_label, value="Days").pack(side="left", padx=50)
             tk.Radiobutton(x_label_frame, text="Hours", variable=x_label, value="Hours").pack(side="left", padx=50)
             x_label.set(self.input_list[self.file_options_var.get()]["xlabel"])
             x_label_frame.pack(fill="both", expand=1, pady=5)
 
-            sg_frame = tk.LabelFrame(self.settings_window, text="Sg-Filter", borderwidth=2, relief="groove")
+            sg_frame = tk.LabelFrame(self.settings_frame, text="Sg-Filter", borderwidth=2, relief="groove")
             sg_filter = tk.BooleanVar()
             sg_filter.set(self.input_list[self.file_options_var.get()]["sg_filter"]["on"])
             tk.Checkbutton(sg_frame, text=" Turn filter on", var=sg_filter).pack(side="left", padx=20)
@@ -407,26 +469,33 @@ if __name__ == "__main__":
             set_settings = tk.BooleanVar()
             set_settings.set(self.input_list[self.file_options_var.get()]["set_settings"])
             if(not self.file_options_var.get() in self.input_list["All"]["file_names"]):
-                set_settings_frame = tk.LabelFrame(self.settings_window, text="Group settings", borderwidth=2,
+                set_settings_frame = tk.LabelFrame(self.settings_frame, text="Group settings", borderwidth=2,
                                                    relief="groove")
                 tk.Checkbutton(set_settings_frame, text=" Set settings for all files in the group",
                                               var=set_settings).pack(side="left", padx=20)
                 set_settings_frame.pack(fill="both", expand=1, pady=5)
 
-            button_frame = tk.Frame(self.settings_window)
-            tk.Button(button_frame, text="Ok", command=lambda:
-                      self.setGeneralSettings(point_size, starting_point, data_number, minute_point,
-                                              period, minimum_exclude, maximum_exclude, x_label, sg_filter,
-                                              set_settings)).pack(side="left", expand=1)
-            tk.Button(button_frame, text="Advanced",
-                      command=self.configureAdvancedSettings).pack(side="left", expand=1)
-            tk.Button(button_frame, text="Cancel",
-                      command=self.settings_window.destroy).pack(side="left", expand=1)
-            button_frame.pack(fill="both", expand=1, pady=5)
+            settings_scrollbar = tk.Scrollbar(self.settings_window, orient="vertical", command=self.settings_canvas.yview)
+            self.settings_canvas.configure(yscrollcommand=settings_scrollbar.set, scrollregion=self.settings_canvas.bbox("all"))
+            settings_scrollbar.pack(side="right", fill="y")
+            self.settings_frame.pack(fill="both", expand=1)
+            self.settings_canvas.pack(fill="both", expand=1)
+            self.settings_canvas.create_window((0,0), window=self.settings_frame)
+            self.settings_frame.bind("<Configure>", self.configureSettingsScrollbar)
+            self.settings_canvas.update()
+            self.settings_canvas.yview_moveto(0)
+            self.settings_window.geometry(str(self.settings_frame.winfo_width()+20) + "x" + str(self.settings_frame.winfo_height()-250))
 
         def configureAdvancedSettings(self):
             self.advanced_settings_window = tk.Toplevel(self.settings_window)
             self.advanced_settings_window.wm_title("Advanced settings")
+
+            button_frame = tk.Frame(self.advanced_settings_window)
+            tk.Button(button_frame, text="Ok", command=lambda:
+                      self.setAdvancedSettings(peak_valley_points, peak_valley_percentage,
+                                               sg_window_size, sg_poly_order)).pack(side="left", expand=1)
+            tk.Button(button_frame, text="Cancel", command=self.advanced_settings_window.destroy).pack(side="left", expand=1)
+            button_frame.pack(fill="both", expand=1, pady=5)
 
             self.peak_valley_frame = tk.LabelFrame(self.advanced_settings_window, text="Peak-Valley settings",
                                               borderwidth=2, relief="groove")
@@ -448,16 +517,10 @@ if __name__ == "__main__":
                                                    1, 2)
             self.sg_filter_frame.pack(fill="both", expand=1, pady=5)
 
-            button_frame = tk.Frame(self.advanced_settings_window)
-            tk.Button(button_frame, text="Ok", command=lambda:
-                      self.setAdvancedSettings(peak_valley_points, peak_valley_percentage,
-                                               sg_window_size, sg_poly_order)).pack(side="left", expand=1)
-            tk.Button(button_frame, text="Cancel", command=self.advanced_settings_window.destroy).pack(side="left", expand=1)
-            button_frame.pack(fill="both", expand=1, pady=5)
-
         def setFiles(self, set_files, name):
-            if(len(set_files) and name.get() and not name.get() in self.input_list):
-                file_list = ["Files"] + list(self.input_list.keys()) + [name.get()]
+            group_name = name.get().strip()
+            if(group_name and not group_name in self.input_list):
+                file_list = ["Files"] + list(self.input_list.keys()) + [group_name]
                 data_per_measurement = sys.maxsize
                 timepoint_indices = []
                 data_minutepoints = sys.maxsize
@@ -480,14 +543,14 @@ if __name__ == "__main__":
                         true_files.append(file)
                         file_paths.append(self.input_list[file]["path"][0])
                         if(output == None):
-                            output = "/".join(os.path.dirname(file).split("/")[:-1]) + "/" + name.get() + "/"
+                            output = "/".join(os.path.dirname(file).split("/")[:-1]) + "/" + group_name + "/"
 
                         val.set(False)
                         none_chosen = False
 
                 if(not none_chosen):
-                    self.columns_index_list[name.get()] = 0
-                    self.input_list[name.get()] = {"file_names": true_files, "path": file_paths, "output": output, "pointsize": 3,
+                    self.columns_index_list[group_name] = 0
+                    self.input_list[group_name] = {"file_names": true_files, "path": file_paths, "output": output, "pointsize": 3,
                                                    "startingpoint": 12,"datanumber": 5, "minutepoint": -1,
                                                    "period": "Both", "color": "#000000",
                                                    "minimum": {"exclude_firstday": False, "exclude_lastday": True},
@@ -499,64 +562,73 @@ if __name__ == "__main__":
                                                    "data_minutepoints": data_minutepoints, "set_columns": {},
                                                    "set_settings": False}
                     self.file_options.set_menu(*file_list)
-                    self.file_options_var.set(name.get())
+                    self.file_options_var.set(group_name)
                     self.file.entryconfig("Remove compared files", state="normal")
                     self.showComparisons()
                 else:
                     messagebox.showerror("File comparison error", "At least one file has to be chosen")
             else:
-                messagebox.showerror("Naming error", "The group name is not allowed to already exist or to be empty.")
+                if(not group_name):
+                    messagebox.showerror("Naming error", "The group name is empty.")
+                elif(group_name in self.input_list):
+                    messagebox.showerror("Naming error", "The group name already exists.")
 
         def setColumns(self, set_column_data):
-            if(len(set_column_data)):
-                chosen_list = []
-                for file,data in set_column_data.items():
-                    true_columns = []
-                    none_chosen = True
-                    for col,val in data.items():
-                        if(val.get()):
-                            true_columns.append(col)
-                            val.set(False)
-                            none_chosen = False
+            chosen_list = []
+            for file,data in set_column_data.items():
+                true_columns = []
+                none_chosen = True
+                for col,val in data.items():
+                    if(val.get()):
+                        true_columns.append(col)
+                        val.set(False)
+                        none_chosen = False
 
-                    chosen_list.append(none_chosen)
-                    if(not none_chosen):
-                        if(not file in self.input_list[self.file_options_var.get()]["set_columns"]):
-                            self.input_list[self.file_options_var.get()]["set_columns"][file] = []
+                chosen_list.append(none_chosen)
+                if(not none_chosen):
+                    if(not file in self.input_list[self.file_options_var.get()]["set_columns"]):
+                        self.input_list[self.file_options_var.get()]["set_columns"][file] = []
 
-                        self.input_list[self.file_options_var.get()]["set_columns"][file].append(str(self.columns_index_list[self.file_options_var.get()])
-                                        + " :=: " + " - ".join(true_columns))
+                    self.input_list[self.file_options_var.get()]["set_columns"][file].append(str(self.columns_index_list[self.file_options_var.get()])
+                                    + " :=: " + " - ".join(true_columns))
 
-                if(len(chosen_list) and not all(chosen_list)):
-                    self.columns_index_list[self.file_options_var.get()] += 1
-                    self.pisa.entryconfig("Remove compared columns", state="normal")
-                    self.showComparisons()
-                else:
-                    messagebox.showerror("Column comparison error", "At least one column has to be chosen")
+            if(len(chosen_list) and not all(chosen_list)):
+                self.canvas.update()
+                self.canvas.xview_moveto(0)
+                self.canvas.yview_moveto(1)
+                self.columns_index_list[self.file_options_var.get()] += 1
+                self.pisa.entryconfig("Remove compared columns", state="normal")
+                self.showComparisons()
+            else:
+                messagebox.showerror("Column comparison error", "At least one column has to be chosen")
 
         def removeFiles(self, files):
-            if(len(files)):
-                for file,val in files.items():
-                    if(val.get()):
-                        self.input_list[self.file_options_var.get()]["file_names"].remove(file)
-                        if(not self.file_options_var.get() in self.input_list["All"]["file_names"]
-                           and self.file_options_var.get() != "All"):
-                            self.input_list[self.file_options_var.get()]["set_columns"].pop(file, None)
+            any_chosen = False
+            for file,val in files.items():
+                if(val.get()):
+                    if(not any_chosen):
+                        any_chosen = True
+
+                    self.input_list[self.file_options_var.get()]["file_names"].remove(file)
+                    if(not self.file_options_var.get() in self.input_list["All"]["file_names"]
+                       and self.file_options_var.get() != "All"):
+                        self.input_list[self.file_options_var.get()]["set_columns"].pop(file, None)
+                    else:
+                        if(self.file_options_var.get() == "All"):
+                            self.input_list.pop(file, None)
                         else:
-                            if(self.file_options_var.get() == "All"):
-                                self.input_list.pop(file, None)
-                            else:
-                                self.input_list["All"]["file_names"].remove(file)
-                                self.input_list["All"]["set_columns"].pop(file, None)
+                            self.input_list["All"]["file_names"].remove(file)
+                            self.input_list["All"]["set_columns"].pop(file, None)
 
-                            for entry in reversed(list(self.input_list.keys())):
-                                if(not entry in self.input_list["All"]["file_names"]
-                                   and file in self.input_list[entry]["file_names"]):
-                                    self.input_list[entry]["file_names"].remove(file)
-                                    self.input_list[entry]["set_columns"].pop(file, None)
-                                    if(not len(self.input_list[entry]["file_names"])):
-                                        self.input_list.pop(entry, None)
+                        for entry in reversed(list(self.input_list.keys())):
+                            if(not entry in self.input_list["All"]["file_names"]
+                               and file in self.input_list[entry]["file_names"]):
+                                self.input_list[entry]["file_names"].remove(file)
+                                self.input_list[entry]["set_columns"].pop(file, None)
+                                if(not len(self.input_list[entry]["file_names"])):
+                                    self.input_list.pop(entry, None)
 
+            if(any_chosen):
                 all_deleted = False
                 if(not len(self.input_list[self.file_options_var.get()]["file_names"])):
                     if(self.file_options_var.get() != "All"):
@@ -580,29 +652,38 @@ if __name__ == "__main__":
                     self.file_options_var.set("All")
 
                 if(not all_deleted):
-                    self.checkComparedColumns()
+                    self.checkComparedColumns(None)
 
                 self.remove_files_window.destroy()
+            else:
+                messagebox.showerror("File removing error", "At least one file has to be chosen.")
 
         def removeColumns(self, columns):
-            if(len(columns)):
-                deleted_list = []
-                for file,data in columns.items():
-                    deleted = False
-                    column_list = self.input_list[self.file_options_var.get()]["set_columns"]
-                    for col,val in data.items():
-                        if(val.get()):
-                            column_list[file].remove(col)
-                            if(not len(column_list[file])):
-                                column_list.pop(file, None)
-                                deleted =True
+            any_chosen = False
+            deleted_list = []
+            for file,data in columns.items():
+                deleted = False
+                column_list = self.input_list[self.file_options_var.get()]["set_columns"]
+                for col,val in data.items():
+                    if(val.get()):
+                        if(not any_chosen):
+                            any_chosen = True
 
-                    deleted_list.append(deleted)
+                        column_list[file].remove(col)
+                        if(not len(column_list[file])):
+                            column_list.pop(file, None)
+                            deleted =True
 
+                deleted_list.append(deleted)
+
+
+            if(any_chosen):
                 self.showComparisons()
                 self.remove_columns_window.destroy()
                 if(all(deleted_list)):
                     self.pisa.entryconfig("Remove compared columns", state="disabled")
+            else:
+                messagebox.showerror("Column removing error", "At least one column has to be chosen.")
 
         def showComparisons(self):
             for child in self.info_frame.winfo_children():
@@ -684,7 +765,7 @@ if __name__ == "__main__":
             else:
                 messagebox.showerror("Parameter error", "The poly order has to be smaller than the window size.")
 
-        def checkComparedColumns(self):
+        def checkComparedColumns(self, dummy):
             if(len(self.input_list[self.file_options_var.get()]["set_columns"])):
                 self.pisa.entryconfig("Remove compared columns", state="normal")
             else:
@@ -766,8 +847,17 @@ if __name__ == "__main__":
             frame.pack(fill="both", expand=1, pady=5)
             return [first_var, second_var]
 
-        def configureScrollbar(self, event):
+        def configureMainScrollbar(self, event):
             self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+        def configureComparingColumnsScrollbar(self, event):
+            self.column_canvas.configure(scrollregion=self.column_canvas.bbox("all"))
+
+        def configureRemoveColumnsScrollbar(self, event):
+            self.remove_canvas.configure(scrollregion=self.remove_canvas.bbox("all"))
+
+        def configureSettingsScrollbar(self, event):
+            self.settings_canvas.configure(scrollregion=self.settings_canvas.bbox("all"))
 
         def showErrorWindow(self, title, simple_message, detailed_message, error_output):
             self.error_window = tk.Toplevel(self)
@@ -813,11 +903,11 @@ if __name__ == "__main__":
             else:
                 self.detailed_error_frame.pack_forget()
                 self.button_var.set("Show details")
-                
+
         def saveTraceback(self, traceback, error_output):
              with open(error_output + "error.txt", "w") as error_writer:
                  error_writer.write(traceback)
-                 
+
     try:
         root = tk.Tk()
         root.withdraw()
