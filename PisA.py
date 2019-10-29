@@ -43,7 +43,6 @@ if __name__ == "__main__":
     class Application(tk.Frame):
 
         def __init__(self, master=None):
-
             self.input_list = {}
             self.input_list["All"] = {"file_names": [], "path": [], "output": None, "pointsize": 3, "startingpoint": 12,
                                       "datanumber": 5, "minutepoint": -1, "period": "Both", "color": "#000000",
@@ -55,7 +54,6 @@ if __name__ == "__main__":
                                       "data_minutepoints": sys.maxsize,"set_columns": {},
                                       "set_settings": False}
             tk.Frame.__init__(self, master)
-            loading_screen = LoadingScreen(self)
             self.master = master
             self.manager = mp.Manager()
             self.progress = self.manager.Value("i", 0.0)
@@ -64,7 +62,6 @@ if __name__ == "__main__":
             self.columns_index_list = {"All": 0}
             self.cancel_analysis = False
             self.initWindow()
-            loading_screen.destroy()
 
         def initWindow(self):
             self.progress_frame = tk.LabelFrame(self, text="Analysis progress", borderwidth=2, relief="groove")
@@ -262,11 +259,14 @@ if __name__ == "__main__":
         def configureFilesWindow(self):
             self.files_window = tk.Toplevel(self)
             self.files_window.wm_title("Comparing files")
+            self.files_window.attributes('-topmost', 'true')
+            self.files_window.resizable(False, False)
 
-            button_frame = tk.Frame(self.files_window)
+            button_frame = tk.LabelFrame(self.files_window, text="",
+                                    borderwidth=2, relief="groove")
             tk.Button(button_frame, text="Set", command=lambda:
-                      self.setFiles(set_files, name)).pack(side="left", expand=1)
-            tk.Button(button_frame, text="Close", command=self.files_window.destroy).pack(side="left", expand=1)
+                      self.setFiles(set_files, name)).pack(side="left", expand=1, pady=3)
+            tk.Button(button_frame, text="Close", command=self.files_window.destroy).pack(side="left", expand=1, pady=3)
             button_frame.pack(fill="both", expand=1, pady=5)
 
             label_frame = tk.Frame(self.files_window)
@@ -292,11 +292,14 @@ if __name__ == "__main__":
         def configureColumnWindow(self):
             self.column_window = tk.Toplevel(self)
             self.column_window.wm_title("Comparing columns")
+            self.column_window.attributes('-topmost', 'true')
+            self.column_window.resizable(False, False)
 
-            button_frame = tk.Frame(self.column_window)
+            button_frame = tk.LabelFrame(self.column_window, text="",
+                                    borderwidth=2, relief="groove")
             tk.Button(button_frame, text="Set", command=lambda:
-                      self.setColumns(set_column_data)).pack(side="left", expand=1)
-            tk.Button(button_frame, text="Close", command=self.column_window.destroy).pack(side="left", expand=1)
+                      self.setColumns(set_column_data)).pack(side="left", expand=1, pady=3)
+            tk.Button(button_frame, text="Close", command=self.column_window.destroy).pack(side="left", expand=1, pady=3)
             button_frame.pack(fill="both", expand=1, pady=5)
 
             self.column_canvas = tk.Canvas(self.column_window)
@@ -336,11 +339,14 @@ if __name__ == "__main__":
         def configureRemoveFilesWindow(self):
             self.remove_files_window = tk.Toplevel(self)
             self.remove_files_window.wm_title("Remove set files")
+            self.remove_files_window.attributes('-topmost', 'true')
+            self.remove_files_window.resizable(False, False)
 
-            button_frame = tk.Frame(self.remove_files_window)
+            button_frame = tk.LabelFrame(self.remove_files_window, text="",
+                                    borderwidth=2, relief="groove")
             tk.Button(button_frame, text="Set", command=lambda:
-                      self.removeFiles(set_files)).pack(side="left", expand=1)
-            tk.Button(button_frame, text="Close", command=self.remove_files_window.destroy).pack(side="left", expand=1)
+                      self.removeFiles(set_files)).pack(side="left", expand=1, pady=3)
+            tk.Button(button_frame, text="Close", command=self.remove_files_window.destroy).pack(side="left", expand=1, pady=3)
             button_frame.pack(fill="both", expand=1, pady=5)
 
             remove_frame = tk.LabelFrame(self.remove_files_window, text="Compared files",
@@ -359,11 +365,14 @@ if __name__ == "__main__":
         def configureRemoveColumnsWindow(self):
             self.remove_columns_window = tk.Toplevel(self)
             self.remove_columns_window.wm_title("Remove set columns")
+            self.remove_columns_window.attributes('-topmost', 'true')
+            self.remove_columns_window.resizable(False, False)
 
-            button_frame = tk.Frame(self.remove_columns_window)
+            button_frame = tk.LabelFrame(self.remove_columns_window, text="",
+                                    borderwidth=2, relief="groove")
             tk.Button(button_frame, text="Set", command=lambda:
-                      self.removeColumns(set_file_columns)).pack(side="left", expand=1)
-            tk.Button(button_frame, text="Close", command=self.remove_columns_window.destroy).pack(side="left", expand=1)
+                      self.removeColumns(set_file_columns)).pack(side="left", expand=1, pady=3)
+            tk.Button(button_frame, text="Close", command=self.remove_columns_window.destroy).pack(side="left", expand=1, pady=3)
             button_frame.pack(fill="both", expand=1, pady=5)
 
             self.remove_canvas = tk.Canvas(self.remove_columns_window)
@@ -405,16 +414,19 @@ if __name__ == "__main__":
         def configureSettings(self):
             self.settings_window = tk.Toplevel(self)
             self.settings_window.wm_title("Analysis settings")
+            self.settings_window.attributes('-topmost', 'true')
+            self.settings_window.resizable(False, False)
 
-            button_frame = tk.Frame(self.settings_window)
+            button_frame = tk.LabelFrame(self.settings_window, text="",
+                                         borderwidth=2, relief="groove")
             tk.Button(button_frame, text="Ok", command=lambda:
                       self.setGeneralSettings(point_size, starting_point, data_number, minute_point,
                                               period, minimum_exclude, maximum_exclude, x_label, sg_filter,
-                                              set_settings)).pack(side="left", expand=1)
+                                              set_settings)).pack(side="left", expand=1, pady=3)
             tk.Button(button_frame, text="Advanced",
-                      command=self.configureAdvancedSettings).pack(side="left", expand=1)
+                      command=self.configureAdvancedSettings).pack(side="left", expand=1, pady=3)
             tk.Button(button_frame, text="Cancel",
-                      command=self.settings_window.destroy).pack(side="left", expand=1)
+                      command=self.settings_window.destroy).pack(side="left", expand=1, pady=3)
             button_frame.pack(fill="both", expand=1, pady=5)
 
             self.settings_canvas = tk.Canvas(self.settings_window)
@@ -494,12 +506,15 @@ if __name__ == "__main__":
         def configureAdvancedSettings(self):
             self.advanced_settings_window = tk.Toplevel(self.settings_window)
             self.advanced_settings_window.wm_title("Advanced settings")
+            self.advanced_settings_window.attributes('-topmost', 'true')
+            self.advanced_settings_window.resizable(False, False)
 
-            button_frame = tk.Frame(self.advanced_settings_window)
+            button_frame = tk.LabelFrame(self.advanced_settings_window, text="",
+                                         borderwidth=2, relief="groove")
             tk.Button(button_frame, text="Ok", command=lambda:
                       self.setAdvancedSettings(peak_valley_points, peak_valley_percentage,
-                                               sg_window_size, sg_poly_order)).pack(side="left", expand=1)
-            tk.Button(button_frame, text="Cancel", command=self.advanced_settings_window.destroy).pack(side="left", expand=1)
+                                               sg_window_size, sg_poly_order)).pack(side="left", expand=1, pady=3)
+            tk.Button(button_frame, text="Cancel", command=self.advanced_settings_window.destroy).pack(side="left", expand=1, pady=3)
             button_frame.pack(fill="both", expand=1, pady=5)
 
             self.peak_valley_frame = tk.LabelFrame(self.advanced_settings_window, text="Peak-Valley settings",
@@ -868,6 +883,8 @@ if __name__ == "__main__":
             self.error_window = tk.Toplevel(self)
             self.error_window.wm_title(title)
             self.error_window.resizable(False, False)
+            self.error_window.attributes('-topmost', 'true')
+            self.error_window.resizable(False, False)
 
             simple_error_frame = tk.Frame(self.error_window)
             simple_error_scrollbar = tk.Scrollbar(simple_error_frame)
@@ -915,7 +932,7 @@ if __name__ == "__main__":
 
     try:
         root = tk.Tk()
-        root.withdraw()
+        loading_screen = LoadingScreen(root)
         root.geometry("380x400")
         try:
             root.iconbitmap("../../icon/leaning-tower-of-pisa.ico")
@@ -926,7 +943,7 @@ if __name__ == "__main__":
         root.style.theme_use("clam")
         root.style.configure("green.Horizontal.TProgressbar", foreground="green", background="green")
         Application(root)
-        root.deiconify()
+        loading_screen.destroy()
         root.mainloop()
     except Exception:
         messagebox.showerror("Critical error", "A critical error occurred while executing the program. See the message below for more details:\n\n"
