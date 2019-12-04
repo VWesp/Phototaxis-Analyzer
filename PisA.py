@@ -193,7 +193,7 @@ if __name__ == "__main__":
                 self.remove_files_window = tk.Toplevel(self)
                 error_output = self.input_list[file_name]["output"]
                 self.removeFiles({file_name: file_name_var})
-                self.showErrorWindow("File error", "An error occurred when opening a file. The file is most likely just in a wrong/unknown format."
+                self.showErrorWindow("File error", "An error occurred while opening a file. The file is most likely just in a wrong/unknown format."
                                      + " Check the file and try again or open a new file.", traceback.format_exc(), error_output)
 
         def startPhotoaxisAnalysis(self):
@@ -563,7 +563,7 @@ if __name__ == "__main__":
                         true_files.append(file)
                         file_paths.append(self.input_list[file]["path"][0])
                         if(output == None):
-                            output = "/".join(os.path.dirname(file).split("/")[:-1]) + "/" + group_name + "/"
+                            output = "/".join(self.input_list[file]["output"].split("/")[:-2]) + "/" + group_name + "/"
 
                         val.set(False)
                         none_chosen = False
@@ -937,7 +937,10 @@ if __name__ == "__main__":
         try:
             root.iconbitmap("../../icon/leaning-tower-of-pisa.ico")
         except:
-            root.iconbitmap("icon/leaning-tower-of-pisa.ico")
+            try:
+                root.iconbitmap("icon/leaning-tower-of-pisa.ico")
+            except:
+                pass
 
         root.style = ttk.Style()
         root.style.theme_use("clam")

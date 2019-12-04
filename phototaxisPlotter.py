@@ -7,6 +7,7 @@ import matplotlib
 matplotlib.use("PS")
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+from matplotlib.pyplot import cm
 from matplotlib.backends.backend_pdf import PdfPages
 import traceback
 
@@ -27,6 +28,14 @@ def plotData(selected_group, input_list, highest_columns_index, progress, lock):
         overall_minimum_phase_list = []
         overall_maximum_period_list = []
         overall_maximum_phase_list = []
+        plot_minimum_period_list = []
+        plot_minimum_phase_list = []
+        plot_maximum_period_list = []
+        plot_maximum_phase_list = []
+        minimum_period_list = []
+        minimum_phase_list = []
+        maximum_period_list = []
+        maximum_phase_list = []
         x_y_values = {}
         for file in input_list[selected_group]["file_names"]:
             columns = list(input_list[file]["data"])[2:]
@@ -47,10 +56,6 @@ def plotData(selected_group, input_list, highest_columns_index, progress, lock):
             x_y_values[file]["day_hours"] = hours
             x_y_values[file]["time_point_labels"] = time_point_labels
             x_y_values[file]["mean_values"]= {}
-            plot_minimum_period_list = []
-            plot_minimum_phase_list = []
-            plot_maximum_period_list = []
-            plot_maximum_phase_list = []
             for column in columns:
                 column_data = input_list[file]["data"][column]
                 max_voltage = np.amax(column_data)
@@ -92,10 +97,6 @@ def plotData(selected_group, input_list, highest_columns_index, progress, lock):
                 mean_maximum_period = 0
                 maximum_periods = 0
                 points = input_list[settings]["pv_points"]
-                minimum_period_list = []
-                minimum_phase_list = []
-                maximum_period_list = []
-                maximum_phase_list = []
                 for day in hours:
                     day_start = (day + (input_list[settings]["startingpoint"] % 2)) - (2 * points)
                     day_end = (day + (input_list[settings]["startingpoint"] % 2)) + (22 + (2 * points))
@@ -183,11 +184,15 @@ def plotData(selected_group, input_list, highest_columns_index, progress, lock):
                             maximum_phase_list.append(str(mean_time%24).replace(".", ",") + ";" + str(meanPeak).replace(".", ","))
                             last_peak = mean_time
 
-
                 plot_minimum_period_list.append(column + ";" + ";".join(minimum_period_list))
                 plot_minimum_phase_list.append(column + ";" + "\n;".join(minimum_phase_list))
                 plot_maximum_period_list.append(column + ";" + ";".join(maximum_period_list))
                 plot_maximum_phase_list.append(column + ";" + "\n;".join(maximum_phase_list))
+                del minimum_period_list[:]
+                del minimum_phase_list[:]
+                del maximum_period_list[:]
+                del maximum_phase_list[:]
+
                 props = dict(boxstyle='round', facecolor='white', alpha=0.15)
                 if(input_list[settings]["period"] == "Minimum"):
                     plt.gcf().text(0.955, 0.5, "mean min period: " + "{0:.2f}".format(mean_minimum_period / minimum_periods) + "h",
@@ -209,6 +214,10 @@ def plotData(selected_group, input_list, highest_columns_index, progress, lock):
             overall_minimum_phase_list.append(file + "\n" + "\n".join(plot_minimum_phase_list))
             overall_maximum_period_list.append(file + "\n" + "\n".join(plot_maximum_period_list))
             overall_maximum_phase_list.append(file + "\n" + "\n".join(plot_maximum_phase_list))
+            del plot_minimum_period_list[:]
+            del plot_minimum_phase_list[:]
+            del plot_maximum_period_list[:]
+            del plot_maximum_phase_list[:]
 
         if(input_list[selected_group]["period"] == "Minimum" or input_list[selected_group]["period"] == "Both"):
             with open(input_list[selected_group]["output"] + "period_log.csv", "a") as period_writer:
@@ -224,41 +233,49 @@ def plotData(selected_group, input_list, highest_columns_index, progress, lock):
             with open(input_list[selected_group]["output"] + "phase_log.csv", "a") as phase_writer:
                 phase_writer.write("Maximum\nSample;Phase;milliVolt\n" + "\n".join(overall_maximum_phase_list))
 
+        del overall_minimum_period_list[:]
+        del overall_minimum_phase_list[:]
+        del overall_maximum_period_list[:]
+        del overall_maximum_phase_list[:]
+
         pdf_document.close()
         if(len(input_list[selected_group]["set_columns"])):
             pdf_compared_document = PdfPages(input_list[selected_group]["output"] + selected_group + "_compared.pdf")
+            current_file_columns_map = {}
+            legend_patches = []
             for i in range(highest_columns_index+1):
-                current_file_columns_list = []
+                number_of_columns = 0
                 for file,column_set in input_list[selected_group]["set_columns"].items():
                     for columns in column_set:
                         column_index = int(columns.split(" :=: ")[0])
                         if(column_index == i):
-                            current_file_columns_list.append({file: columns})
+                            current_file_columns_map[file] = columns
+                            number_of_columns += len(columns.split(" :=: ")[1].split(" - "))
                             break
 
-                if(len(current_file_columns_list)):
-                    legend_patches = []
+                if(number_of_columns != 0):
                     first_plot = True
+                    colors = iter(cm.rainbow(np.linspace(0, 1, number_of_columns)))
                     figure = plt.figure()
-                    for file_column_item in current_file_columns_list:
-                        for file,column_set in file_column_item.items():
-                            columns = column_set.split(" :=: ")[1].split(" - ")
-                            x = x_y_values[file]["time_points"]
-                            for column in columns:
-                                y = x_y_values[file]["mean_values"][column]
-                                legend_patch, = plt.plot(x, y, label=file+"|"+column, marker="o", markersize=input_list[selected_group]["pointsize"],
-                                                         linestyle="-")
-                                legend_patches.append(legend_patch)
-                                if(first_plot):
-                                    plt.title(str(i) + "\n" + selected_group)
-                                    plt.xticks(x_y_values[file]["day_hours"], x_y_values[file]["time_point_labels"])
-                                    plt.xlabel(input_list[file]["xlabel"])
-                                    plt.ylabel("mV")
-                                    for day in x_y_values[file]["day_hours"]:
-                                        if(day in x_y_values[file]["time_points"]):
-                                            plt.axvline(day, color="black", linestyle=":")
+                    for file,column_set in current_file_columns_map.items():
+                        columns = column_set.split(" :=: ")[1].split(" - ")
+                        x = x_y_values[file]["time_points"]
+                        for column in columns:
+                            y = x_y_values[file]["mean_values"][column]
+                            color = next(colors)
+                            legend_patch, = plt.plot(x, y, label=file+"|"+column, marker="o", markersize=input_list[selected_group]["pointsize"],
+                                                     linestyle="-", color=color)
+                            legend_patches.append(legend_patch)
+                            if(first_plot):
+                                plt.title(str(i) + "\n" + selected_group)
+                                plt.xticks(x_y_values[file]["day_hours"], x_y_values[file]["time_point_labels"])
+                                plt.xlabel(input_list[file]["xlabel"])
+                                plt.ylabel("mV")
+                                for day in x_y_values[file]["day_hours"]:
+                                    if(day in x_y_values[file]["time_points"]):
+                                        plt.axvline(day, color="black", linestyle=":")
 
-                                    firstPlot = False
+                                firstPlot = False
 
                         with lock:
                             progress.value += 1
@@ -268,8 +285,11 @@ def plotData(selected_group, input_list, highest_columns_index, progress, lock):
                     plt.close()
                     del legend_patches[:]
 
+                current_file_columns_map.clear()
+
             pdf_compared_document.close()
 
+        x_y_values.clear()
         return
     except:
         return traceback.format_exc()
