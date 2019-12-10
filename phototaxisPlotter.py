@@ -100,6 +100,10 @@ def plotData(selected_group, input_list, highest_columns_index, progress, lock):
                 for day in hours:
                     day_start = (day + (input_list[settings]["startingpoint"] % 2)) - (2 * points)
                     day_end = (day + (input_list[settings]["startingpoint"] % 2)) + (22 + (2 * points))
+                    if(input_list[settings]["dn_cycle"]["on"]):
+                        plt.axvspan(day_end-12, day_end, facecolor=input_list[settings]["dn_cycle"]["background"],
+                                    alpha=float(input_list[settings]["dn_cycle"]["visibility"])/100)
+
                     if(day == 0):
                         day_start = input_list[settings]["startingpoint"]
                     else:
@@ -271,9 +275,15 @@ def plotData(selected_group, input_list, highest_columns_index, progress, lock):
                                 plt.xticks(x_y_values[file]["day_hours"], x_y_values[file]["time_point_labels"])
                                 plt.xlabel(input_list[file]["xlabel"])
                                 plt.ylabel("mV")
+                                points = input_list[file]["pv_points"]
                                 for day in x_y_values[file]["day_hours"]:
                                     if(day in x_y_values[file]["time_points"]):
                                         plt.axvline(day, color="black", linestyle=":")
+
+                                    if(input_list[file]["dn_cycle"]["on"]):
+                                        day_end = (day + (input_list[file]["startingpoint"] % 2)) + (22 + (2 * points))
+                                        plt.axvspan(day_end-12, day_end, facecolor=input_list[file]["dn_cycle"]["background"],
+                                                    alpha=float(input_list[settings]["dn_cycle"]["visibility"])/100)
 
                                 firstPlot = False
 

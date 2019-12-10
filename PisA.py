@@ -51,8 +51,8 @@ if __name__ == "__main__":
                                       "xlabel": "Days","sg_filter": {"on": False, "window": 11, "poly": 3,
                                       "color": "#800000"},"pv_points": 1, "pv_amp_per": 3,
                                       "data_per_measurement": sys.maxsize,"timepoint_indices": [],
-                                      "data_minutepoints": sys.maxsize,"set_columns": {},
-                                      "set_settings": False}
+                                      "data_minutepoints": sys.maxsize,"set_columns": {}, "dn_cycle": {"on": True,
+                                      "background": "#929591", "visibility": 50}, "set_settings": False}
             tk.Frame.__init__(self, master)
             self.master = master
             self.manager = mp.Manager()
@@ -155,8 +155,8 @@ if __name__ == "__main__":
                                                       "minimum": {"exclude_firstday": False, "exclude_lastday": True},
                                                       "maximum": {"exclude_firstday": True, "exclude_lastday": False},
                                                       "xlabel": "Days", "sg_filter": {"on": False, "window": 11, "poly": 3,
-                                                      "color": "#800000"}, "pv_points": 1, "pv_amp_per": 3,
-                                                      "set_columns": {}, "set_settings": False}
+                                                      "color": "#800000"}, "pv_points": 1, "pv_amp_per": 3, "dn_cycle": {"on": True,
+                                                      "background": "#929591", "visibility": 50}, "set_columns": {}, "set_settings": False}
                         file_options_list.append(file_name)
                         self.file_options.set_menu(*file_options_list)
                         self.file_options_var.set(file_name)
@@ -422,7 +422,7 @@ if __name__ == "__main__":
             tk.Button(button_frame, text="Ok", command=lambda:
                       self.setGeneralSettings(point_size, starting_point, data_number, minute_point,
                                               period, minimum_exclude, maximum_exclude, x_label, sg_filter,
-                                              set_settings)).pack(side="left", expand=1, pady=3)
+                                              dn_cycle, visibility, set_settings)).pack(side="left", expand=1, pady=3)
             tk.Button(button_frame, text="Advanced",
                       command=self.configureAdvancedSettings).pack(side="left", expand=1, pady=3)
             tk.Button(button_frame, text="Cancel",
@@ -456,7 +456,7 @@ if __name__ == "__main__":
                                                 self.input_list[self.file_options_var.get()]["data_minutepoints"])
 
             tk.Button(self.general_settings_frame, text="Color of plot", command=lambda:
-                      self.setPlotColor(False)).pack()
+                      self.setPlotColor(1)).pack()
             self.general_settings_frame.pack(fill="both", expand=1)
 
             minimum_exclude = self.buildExcludeField(self.settings_frame, "Minimum", " Exclude first day",
@@ -475,12 +475,29 @@ if __name__ == "__main__":
             x_label.set(self.input_list[self.file_options_var.get()]["xlabel"])
             x_label_frame.pack(fill="both", expand=1, pady=5)
 
+            cycle_frame = tk.LabelFrame(self.settings_frame, text="Color day-night cycle", borderwidth=2, relief="groove")
+            background_frame = tk.Frame(cycle_frame)
+            dn_cycle = tk.BooleanVar()
+            dn_cycle.set(self.input_list[self.file_options_var.get()]["dn_cycle"]["on"])
+            tk.Checkbutton(background_frame, text=" Turn background color on", var=dn_cycle).pack(side="left", padx=35)
+            background_frame.pack(fill="both", expand=1, pady=5)
+            background_color_frame = tk.Frame(cycle_frame)
+            tk.Button(background_color_frame, text="Set color of background", command=lambda:
+                      self.setPlotColor(2)).pack(side="left", padx=35)
+            background_color_frame.pack(fill="both", expand=1, pady=5)
+            visibility_frame = tk.Frame(cycle_frame)
+            visibility = self.buildLabelScale(visibility_frame, "Opacity of background",
+                                              self.input_list[self.file_options_var.get()]["dn_cycle"]["visibility"],
+                                              0, 100)
+            visibility_frame.pack(fill="both", expand=1, pady=5)
+            cycle_frame.pack(fill="both", expand=1, pady=5)
+
             sg_frame = tk.LabelFrame(self.settings_frame, text="Sg-Filter", borderwidth=2, relief="groove")
             sg_filter = tk.BooleanVar()
             sg_filter.set(self.input_list[self.file_options_var.get()]["sg_filter"]["on"])
             tk.Checkbutton(sg_frame, text=" Turn filter on", var=sg_filter).pack(side="left", padx=20)
-            sg_plot_color = tk.Button(sg_frame, text="Set color of SG-Plot", command=lambda:
-                                      self.setPlotColor(True)).pack(side="left")
+            tk.Button(sg_frame, text="Set color of SG-Plot", command=lambda:
+                      self.setPlotColor(0)).pack(side="left")
             sg_frame.pack(fill="both", expand=1, pady=5)
 
             set_settings = tk.BooleanVar()
@@ -489,7 +506,7 @@ if __name__ == "__main__":
                 set_settings_frame = tk.LabelFrame(self.settings_frame, text="Group settings", borderwidth=2,
                                                    relief="groove")
                 tk.Checkbutton(set_settings_frame, text=" Set settings for all files in the group",
-                                              var=set_settings).pack(side="left", padx=20)
+                               var=set_settings).pack(side="left", padx=20)
                 set_settings_frame.pack(fill="both", expand=1, pady=5)
 
             settings_scrollbar = tk.Scrollbar(self.settings_window, orient="vertical", command=self.settings_canvas.yview)
@@ -578,9 +595,9 @@ if __name__ == "__main__":
                                                    "xlabel": "Days", "sg_filter": {"on": False, "window": 11,
                                                    "poly": 3,"color": "#800000"}, "pv_points": 1, "pv_amp_per": 3,
                                                    "data_per_measurement": data_per_measurement,
-                                                   "timepoint_indices": timepoint_indices,
-                                                   "data_minutepoints": data_minutepoints, "set_columns": {},
-                                                   "set_settings": False}
+                                                   "timepoint_indices": timepoint_indices, "set_columns": {},
+                                                   "data_minutepoints": data_minutepoints, "dn_cycle": {"on": True,
+                                                   "background": "#929591", "visibility": 50}, "set_settings": False}
                     self.file_options.set_menu(*file_list)
                     self.file_options_var.set(group_name)
                     self.file.entryconfig("Remove compared files", state="normal")
@@ -743,7 +760,7 @@ if __name__ == "__main__":
 
         def setGeneralSettings(self, point_size, starting_point, data_number, minute_point,
                                period, minimum_exclude, maximum_exclude, x_label, sg_filter,
-                               set_settings):
+                               dn_cycle, visibility, set_settings):
             global input_list
             self.input_list[self.file_options_var.get()]["pointsize"] = point_size.get()
             self.input_list[self.file_options_var.get()]["startingpoint"] = starting_point.get()
@@ -755,25 +772,34 @@ if __name__ == "__main__":
             self.input_list[self.file_options_var.get()]["maximum"]["exclude_lastday"] = maximum_exclude[0].get()
             self.input_list[self.file_options_var.get()]["maximum"]["exclude_lastday"] = maximum_exclude[1].get()
             self.input_list[self.file_options_var.get()]["xlabel"] = x_label.get()
+            self.input_list[self.file_options_var.get()]["dn_cycle"]["on"] = dn_cycle.get()
+            self.input_list[self.file_options_var.get()]["dn_cycle"]["visibility"] = visibility.get()
             self.input_list[self.file_options_var.get()]["sg_filter"]["on"] = sg_filter.get()
             self.input_list[self.file_options_var.get()]["set_settings"] = set_settings.get()
             self.settings_window.destroy()
 
         def setPlotColor(self, sg):
-            if(sg):
+            if(sg == 0):
                 plot_color = tkcc.askcolor(initialcolor=self.input_list[self.file_options_var.get()]["sg_filter"]["color"],
                                            title="SG-Plot color")[-1]
                 if(plot_color == None):
                     plot_color = "#800000"
 
                 self.input_list[self.file_options_var.get()]["sg_filter"]["color"] = plot_color
-            else:
+            elif(sg == 1):
                 plot_color = tkcc.askcolor(initialcolor=self.input_list[self.file_options_var.get()]["color"],
                                            title="Plot color")[-1]
                 if(plot_color == None):
                     plot_color = "#000000"
 
                 self.input_list[self.file_options_var.get()]["color"] = plot_color
+            elif(sg == 2):
+                background_color = tkcc.askcolor(initialcolor=self.input_list[self.file_options_var.get()]["dn_cycle"]["background"],
+                                                 title="Background color")[-1]
+                if(background_color == None):
+                    plotbackground_color_color = "#929591"
+
+                self.input_list[self.file_options_var.get()]["dn_cycle"]["background"] = background_color
 
         def setAdvancedSettings(self, peak_valley_points, peak_valley_percentage, sg_window_size, sg_poly_order):
             if(int(sg_poly_order.get()) < int(sg_window_size.get())):

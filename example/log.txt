@@ -1,10 +1,10 @@
 #Log file of group: PhT64_32_2019-04-30_11-09-59.txt
 #<---------- file/group PhT64_32_2019-04-30_11-09-59.txt ---------->
 [file_names]	PhT64_32_2019-04-30_11-09-59.txt
-[path]	C:/Users/euidhtn/Desktop/Phototaxis-Analyzer/example/PhT64_32_2019-04-30_11-09-59.txt
-[output]	C:/Users/euidhtn/Desktop/Phototaxis-Analyzer/example/
+[path]	/home/valentin/git/Phototaxis-Analyzer/example/PhT64_32_2019-04-30_11-09-59.txt
+[output]	/home/valentin/git/Phototaxis-Analyzer/example/
 [pointsize]	3
-[startingpoint]	12
+[startingpoint]	12.0
 [datanumber]	5
 [minutepoint]	-1
 [period]	Both
@@ -15,7 +15,8 @@
 [sg_filter]	{'on': False, 'window': 11, 'poly': 3, 'color': '#800000'}
 [pv_points]	1
 [pv_amp_per]	3
-[set_columns]	{}
+[dn_cycle]	{'on': True, 'background': '#929591', 'visibility': 50}
+[set_columns]	PhT64_32_2019-04-30_11-09-59.txt=0 :=: 1 - 2 - 3 - 4 - 5-1 :=: 6 - 7 - 8 - 9 - 10-2 :=: 11 - 12 - 13 - 14 - 15-3 :=: 16 - 17 - 18 - 19 - 20-4 :=: 21 - 22 - 23 - 24 - 25-5 :=: 26 - 27 - 28 - 29 - 30-6 :=: 31 - 32
 [set_settings]	False
 [data_per_measurement]	40
 [data_minutepoints]	19
