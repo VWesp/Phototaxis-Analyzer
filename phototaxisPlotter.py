@@ -9,8 +9,10 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib.pyplot import cm
 from matplotlib.backends.backend_pdf import PdfPages
-import traceback
 
+import pandas as pd
+import traceback
+import datetime
 
 def plotData(selected_group, input_list, highest_columns_index, progress, lock):
     try:
@@ -241,12 +243,15 @@ def plotData(selected_group, input_list, highest_columns_index, progress, lock):
         del overall_minimum_phase_list[:]
         del overall_maximum_period_list[:]
         del overall_maximum_phase_list[:]
-
         pdf_document.close()
         if(len(input_list[selected_group]["set_columns"])):
             pdf_compared_document = PdfPages(input_list[selected_group]["output"] + selected_group + "_compared.pdf")
             current_file_columns_map = {}
+            merged_columns = []
+            np_merged_columns = []
+            modified_y = []
             legend_patches = []
+            new_plots_df = pd.DataFrame()
             for i in range(highest_columns_index+1):
                 number_of_columns = 0
                 for file,column_set in input_list[selected_group]["set_columns"].items():
@@ -266,11 +271,20 @@ def plotData(selected_group, input_list, highest_columns_index, progress, lock):
                         x = x_y_values[file]["time_points"]
                         for column in columns:
                             y = x_y_values[file]["mean_values"][column]
-                            color = next(colors)
-                            legend_patch, = plt.plot(x, y, label=file+"|"+column, marker="o", markersize=input_list[selected_group]["pointsize"],
-                                                     linestyle="-", color=color)
-                            legend_patches.append(legend_patch)
+                            if(not input_list[selected_group]["merge_plots"]["on"]):
+                                color = next(colors)
+                                legend_patch, = plt.plot(x, y, label=file+"|"+column, marker="o", markersize=input_list[selected_group]["pointsize"],
+                                                         linestyle="-", color=color)
+                                legend_patches.append(legend_patch)
+                            else:
+                                merged_columns.append(y)
+                                legend_patches.append(mpatches.Patch(color=input_list[selected_group]["merge_plots"]["color"],
+                                                      label=file+"|"+column))
+
                             if(first_plot):
+                                time_points = x_y_values[file]["time_points"]
+                                new_plots_df["h"] = [str(s).replace(".", ",") for s in (time_points - 12)]
+                                new_plots_df["°C"] = ["-0,0"] * len(time_points)
                                 plt.title(str(i) + "\n" + selected_group)
                                 plt.xticks(x_y_values[file]["day_hours"], x_y_values[file]["time_point_labels"])
                                 plt.xlabel(input_list[file]["xlabel"])
@@ -285,10 +299,36 @@ def plotData(selected_group, input_list, highest_columns_index, progress, lock):
                                         plt.axvspan(day_end-12, day_end, facecolor=input_list[file]["dn_cycle"]["background"],
                                                     alpha=float(input_list[settings]["dn_cycle"]["visibility"])/100)
 
-                                firstPlot = False
+                                first_plot = False
 
-                        with lock:
-                            progress.value += 1
+                            if(input_list[selected_group]["merge_plots"]["on"]):
+                                with lock:
+                                    progress.value += 0.5
+                            else:
+                                with lock:
+                                    progress.value += 1
+
+                    if(input_list[selected_group]["merge_plots"]["on"]):
+                        np_merged_columns = np.asarray(merged_columns)
+                        for index in range(len(np_merged_columns[0])):
+                            column_data = np.asarray(np_merged_columns[:,index])
+                            column_data_median = np.abs(column_data - np.median(column_data))
+                            mad = np.median(column_data_median)
+                            modified_z = (0.6745 * column_data_median) / (mad if mad else 1)
+                            mod_column_data = column_data[modified_z<=input_list[selected_group]["merge_plots"]["threshold"]]
+                            avg_mod_column_data = np.mean(mod_column_data)
+                            modified_y.append(avg_mod_column_data)
+                            with lock:
+                                progress.value += 0.5
+
+                        max_modified_y = np.amax(modified_y)
+                        min_modified_y = np.amin(modified_y)
+                        modified_y_inverted = np.array((max_modified_y + min_modified_y) - modified_y)
+                        new_plots_df[i+1] = [str(s).replace(".", ",") for s in modified_y_inverted]
+                        plt.plot(time_points, modified_y, color=input_list[selected_group]["merge_plots"]["color"], marker="o", linestyle="-",
+                                 markersize=input_list[selected_group]["pointsize"])
+                        del merged_columns[:]
+                        del modified_y[:]
 
                     plt.legend(handles=legend_patches, bbox_to_anchor=(1.05,0.5))
                     pdf_compared_document.savefig(figure, bbox_inches="tight")
@@ -298,6 +338,15 @@ def plotData(selected_group, input_list, highest_columns_index, progress, lock):
                 current_file_columns_map.clear()
 
             pdf_compared_document.close()
+            if(input_list[selected_group]["merge_plots"]["on"]):
+                new_plots_df.to_csv(input_list[selected_group]["output"] + selected_group + "_merged.txt",
+                                    index=None, sep="\t")
+                with open(input_list[selected_group]["output"] + selected_group + "_merged.txt", "r+") as merge_reader:
+                    content = merge_reader.read()
+                    merge_reader.seek(0, 0)
+                    merge_reader.write(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") + "\n" + content)
+
+            del new_plots_df
 
         x_y_values.clear()
         return

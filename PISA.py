@@ -19,7 +19,6 @@ if __name__ == "__main__":
 
         def __init__(self, parent):
             tk.Toplevel.__init__(self, parent)
-            self.resizable(False, False)
             self.title("Loading screen")
             try:
                 loading_image = None
@@ -50,9 +49,10 @@ if __name__ == "__main__":
                                       "maximum": {"exclude_firstday": True, "exclude_lastday": False},
                                       "xlabel": "Days","sg_filter": {"on": False, "window": 11, "poly": 3,
                                       "color": "#800000"},"pv_points": 1, "pv_amp_per": 3,
-                                      "data_per_measurement": sys.maxsize,"timepoint_indices": [],
-                                      "data_minutepoints": sys.maxsize,"set_columns": {}, "dn_cycle": {"on": True,
-                                      "background": "#929591", "visibility": 50}, "set_settings": False}
+                                      "data_per_measurement": sys.maxsize, "timepoint_indices": [],
+                                      "data_minutepoints": sys.maxsize, "set_columns": {}, "dn_cycle": {"on": True,
+                                      "background": "#929591", "visibility": 50}, "set_settings": False,
+                                      "merge_plots": {"on": False, "threshold": 3.5, "color": "#000000"}}
             tk.Frame.__init__(self, master)
             self.master = master
             self.manager = mp.Manager()
@@ -70,7 +70,7 @@ if __name__ == "__main__":
                             length=380, style="green.Horizontal.TProgressbar").pack()
             self.progress_frame.pack()
 
-            self.master.title("PisA - [P]hototax[is]-[A]nalyzer")
+            self.master.title("PISA - [P]hototax[IS]-[A]nalyzer")
             self.pack(fill="both", expand=1)
             self.files_frame = tk.LabelFrame(self, text="Files", borderwidth=2, relief="groove")
             self.file_options_frame = tk.Frame(self.files_frame)
@@ -122,10 +122,10 @@ if __name__ == "__main__":
             self.pisa.add_separator()
             self.pisa.add_command(label="Settings", command=self.configureSettings)
             self.pisa.entryconfig("Cancel analysis", state="disabled")
-            self.menu.add_cascade(label="PisA analysis", menu=self.pisa)
-            self.menu.entryconfig("PisA analysis", state="disabled")
+            self.menu.add_cascade(label="PISA analysis", menu=self.pisa)
+            self.menu.entryconfig("PISA analysis", state="disabled")
             self.exit = tk.Menu(self.menu, tearoff=0)
-            self.exit.add_command(label="Exit PisA", command=self.closeApplication)
+            self.exit.add_command(label="Exit PISA", command=self.closeApplication)
             self.menu.add_cascade(label="Exit", menu=self.exit)
 
 
@@ -137,13 +137,13 @@ if __name__ == "__main__":
                 if(len(file)):
                     if(not len(self.input_list["All"]["file_names"])):
                         self.file.entryconfig("Compare files", state="normal")
-                        self.menu.entryconfig("PisA analysis", state="normal")
+                        self.menu.entryconfig("PISA analysis", state="normal")
                         self.pisa.entryconfig("Remove compared columns", state="disabled")
                         self.file_options.configure(state="normal")
                         self.input_list["All"]["output"] = "/".join(os.path.dirname(file).split("/")[:-1]) + "/all/"
 
                     file_options_list = ["Files"] + list(self.input_list.keys())
-                    file_name = os.path.basename(file)
+                    file_name = ".".join(os.path.basename(file).split(".")[:-1])
                     if(not file_name in file_options_list):
                         self.file.entryconfig("Remove compared files", state="normal")
                         self.input_list["All"]["file_names"].append(file_name)
@@ -156,7 +156,8 @@ if __name__ == "__main__":
                                                       "maximum": {"exclude_firstday": True, "exclude_lastday": False},
                                                       "xlabel": "Days", "sg_filter": {"on": False, "window": 11, "poly": 3,
                                                       "color": "#800000"}, "pv_points": 1, "pv_amp_per": 3, "dn_cycle": {"on": True,
-                                                      "background": "#929591", "visibility": 50}, "set_columns": {}, "set_settings": False}
+                                                      "background": "#929591", "visibility": 50}, "set_columns": {}, "set_settings": False,
+                                                      "merge_plots": {"on": False, "threshold": 3.5, "color": "#000000"}}
                         file_options_list.append(file_name)
                         self.file_options.set_menu(*file_options_list)
                         self.file_options_var.set(file_name)
@@ -194,7 +195,7 @@ if __name__ == "__main__":
                 error_output = self.input_list[file_name]["output"]
                 self.removeFiles({file_name: file_name_var})
                 self.showErrorWindow("File error", "An error occurred while opening a file. The file is most likely just in a wrong/unknown format."
-                                     + " Check the file and try again or open a new file.", traceback.format_exc(), error_output)
+                                     " Check the file and try again or open a new file.", traceback.format_exc(), error_output)
 
         def startPhotoaxisAnalysis(self):
             self.disableMenus()
@@ -260,7 +261,6 @@ if __name__ == "__main__":
             self.files_window = tk.Toplevel(self)
             self.files_window.wm_title("Comparing files")
             self.files_window.attributes('-topmost', 'true')
-            self.files_window.resizable(False, False)
 
             button_frame = tk.LabelFrame(self.files_window, text="",
                                     borderwidth=2, relief="groove")
@@ -293,7 +293,6 @@ if __name__ == "__main__":
             self.column_window = tk.Toplevel(self)
             self.column_window.wm_title("Comparing columns")
             self.column_window.attributes('-topmost', 'true')
-            self.column_window.resizable(False, False)
 
             button_frame = tk.LabelFrame(self.column_window, text="",
                                     borderwidth=2, relief="groove")
@@ -332,7 +331,7 @@ if __name__ == "__main__":
             column_frame.bind("<Configure>", self.configureComparingColumnsScrollbar)
             self.column_canvas.update()
             self.column_canvas.yview_moveto(0)
-            width = 370 if column_frame.winfo_width()+20 > 370 else column_frame.winfo_width()+20
+            width = 400 if column_frame.winfo_width()+20 > 400 else column_frame.winfo_width()+20
             height = 210 if column_frame.winfo_height()+50 > 210 else column_frame.winfo_height()+50
             self.column_window.geometry(str(width) + "x" + str(height))
 
@@ -340,7 +339,6 @@ if __name__ == "__main__":
             self.remove_files_window = tk.Toplevel(self)
             self.remove_files_window.wm_title("Remove set files")
             self.remove_files_window.attributes('-topmost', 'true')
-            self.remove_files_window.resizable(False, False)
 
             button_frame = tk.LabelFrame(self.remove_files_window, text="",
                                     borderwidth=2, relief="groove")
@@ -366,7 +364,6 @@ if __name__ == "__main__":
             self.remove_columns_window = tk.Toplevel(self)
             self.remove_columns_window.wm_title("Remove set columns")
             self.remove_columns_window.attributes('-topmost', 'true')
-            self.remove_columns_window.resizable(False, False)
 
             button_frame = tk.LabelFrame(self.remove_columns_window, text="",
                                     borderwidth=2, relief="groove")
@@ -415,14 +412,14 @@ if __name__ == "__main__":
             self.settings_window = tk.Toplevel(self)
             self.settings_window.wm_title("Analysis settings")
             self.settings_window.attributes('-topmost', 'true')
-            self.settings_window.resizable(False, False)
 
             button_frame = tk.LabelFrame(self.settings_window, text="",
                                          borderwidth=2, relief="groove")
             tk.Button(button_frame, text="Ok", command=lambda:
                       self.setGeneralSettings(point_size, starting_point, data_number, minute_point,
                                               period, minimum_exclude, maximum_exclude, x_label, sg_filter,
-                                              dn_cycle, visibility, set_settings)).pack(side="left", expand=1, pady=3)
+                                              dn_cycle, visibility, merge_setting, merge_threshold, set_settings)
+                                              ).pack(side="left", expand=1, pady=3)
             tk.Button(button_frame, text="Advanced",
                       command=self.configureAdvancedSettings).pack(side="left", expand=1, pady=3)
             tk.Button(button_frame, text="Cancel",
@@ -492,11 +489,26 @@ if __name__ == "__main__":
             visibility_frame.pack(fill="both", expand=1, pady=5)
             cycle_frame.pack(fill="both", expand=1, pady=5)
 
+            merge_frame = tk.LabelFrame(self.settings_frame, text="Merge compared plots", borderwidth=2, relief="groove")
+            merge_settings = tk.Frame(merge_frame)
+            merge_setting = tk.BooleanVar()
+            merge_setting.set(self.input_list[self.file_options_var.get()]["merge_plots"]["on"])
+            tk.Checkbutton(merge_settings, text=" Merge set plots/columns", var=merge_setting).pack(side="left", padx=20)
+            tk.Button(merge_settings, text="Color of merged plot", command=lambda:
+                      self.setPlotColor(3)).pack(side="left")
+            merge_settings.pack(fill="both", expand=1, pady=5)
+            merge_threshold_frame = tk.Frame(merge_frame)
+            merge_threshold = self.buildLabelSpinbox(merge_threshold_frame, "Threshold for outliers",
+                                                     self.input_list[self.file_options_var.get()]["merge_plots"]["threshold"],
+                                                     0.1, 3)
+            merge_threshold_frame.pack(fill="both", expand=1, pady=5)
+            merge_frame.pack(fill="both", expand=1, pady=5)
+
             sg_frame = tk.LabelFrame(self.settings_frame, text="Sg-Filter", borderwidth=2, relief="groove")
             sg_filter = tk.BooleanVar()
             sg_filter.set(self.input_list[self.file_options_var.get()]["sg_filter"]["on"])
             tk.Checkbutton(sg_frame, text=" Turn filter on", var=sg_filter).pack(side="left", padx=20)
-            tk.Button(sg_frame, text="Set color of SG-Plot", command=lambda:
+            tk.Button(sg_frame, text="Color of SG-Plot", command=lambda:
                       self.setPlotColor(0)).pack(side="left")
             sg_frame.pack(fill="both", expand=1, pady=5)
 
@@ -518,13 +530,12 @@ if __name__ == "__main__":
             self.settings_frame.bind("<Configure>", self.configureSettingsScrollbar)
             self.settings_canvas.update()
             self.settings_canvas.yview_moveto(0)
-            self.settings_window.geometry(str(self.settings_frame.winfo_width()+20) + "x" + str(self.settings_frame.winfo_height()-250))
+            self.settings_window.geometry(str(self.settings_frame.winfo_width()+20) + "x" + str(self.settings_frame.winfo_height()-580))
 
         def configureAdvancedSettings(self):
             self.advanced_settings_window = tk.Toplevel(self.settings_window)
             self.advanced_settings_window.wm_title("Advanced settings")
             self.advanced_settings_window.attributes('-topmost', 'true')
-            self.advanced_settings_window.resizable(False, False)
 
             button_frame = tk.LabelFrame(self.advanced_settings_window, text="",
                                          borderwidth=2, relief="groove")
@@ -597,7 +608,8 @@ if __name__ == "__main__":
                                                    "data_per_measurement": data_per_measurement,
                                                    "timepoint_indices": timepoint_indices, "set_columns": {},
                                                    "data_minutepoints": data_minutepoints, "dn_cycle": {"on": True,
-                                                   "background": "#929591", "visibility": 50}, "set_settings": False}
+                                                   "background": "#929591", "visibility": 50}, "set_settings": False,
+                                                   "merge_plots": {"on": False, "threshold": 3.5, "color": "#000000"}}
                     self.file_options.set_menu(*file_list)
                     self.file_options_var.set(group_name)
                     self.file.entryconfig("Remove compared files", state="normal")
@@ -679,7 +691,7 @@ if __name__ == "__main__":
                         self.file_options.configure(state="disabled")
                         self.file.entryconfig("Compare files", state="disabled")
                         self.file.entryconfig("Remove compared files", state="disabled")
-                        self.menu.entryconfig("PisA analysis", state="disabled")
+                        self.menu.entryconfig("PISA analysis", state="disabled")
                         all_deleted = True
                         for child in self.info_frame.winfo_children():
                             child.pack_forget()
@@ -760,7 +772,7 @@ if __name__ == "__main__":
 
         def setGeneralSettings(self, point_size, starting_point, data_number, minute_point,
                                period, minimum_exclude, maximum_exclude, x_label, sg_filter,
-                               dn_cycle, visibility, set_settings):
+                               dn_cycle, visibility, merge_setting, merge_threshold, set_settings):
             global input_list
             self.input_list[self.file_options_var.get()]["pointsize"] = point_size.get()
             self.input_list[self.file_options_var.get()]["startingpoint"] = starting_point.get()
@@ -775,6 +787,8 @@ if __name__ == "__main__":
             self.input_list[self.file_options_var.get()]["dn_cycle"]["on"] = dn_cycle.get()
             self.input_list[self.file_options_var.get()]["dn_cycle"]["visibility"] = visibility.get()
             self.input_list[self.file_options_var.get()]["sg_filter"]["on"] = sg_filter.get()
+            self.input_list[self.file_options_var.get()]["merge_plots"]["on"] = merge_setting.get()
+            self.input_list[self.file_options_var.get()]["merge_plots"]["threshold"] = merge_threshold.get()
             self.input_list[self.file_options_var.get()]["set_settings"] = set_settings.get()
             self.settings_window.destroy()
 
@@ -800,6 +814,13 @@ if __name__ == "__main__":
                     plotbackground_color_color = "#929591"
 
                 self.input_list[self.file_options_var.get()]["dn_cycle"]["background"] = background_color
+            elif(sg == 3):
+                plot_color = tkcc.askcolor(initialcolor=self.input_list[self.file_options_var.get()]["merge_plots"]["color"],
+                                           title="Merged plot color")[-1]
+                if(plot_color == None):
+                    plot_color = "#000000"
+
+                self.input_list[self.file_options_var.get()]["merge_plots"]["color"] = plot_color
 
         def setAdvancedSettings(self, peak_valley_points, peak_valley_percentage, sg_window_size, sg_poly_order):
             if(int(sg_poly_order.get()) < int(sg_window_size.get())):
@@ -908,9 +929,7 @@ if __name__ == "__main__":
         def showErrorWindow(self, title, simple_message, detailed_message, error_output):
             self.error_window = tk.Toplevel(self)
             self.error_window.wm_title(title)
-            self.error_window.resizable(False, False)
             self.error_window.attributes('-topmost', 'true')
-            self.error_window.resizable(False, False)
 
             simple_error_frame = tk.Frame(self.error_window)
             simple_error_scrollbar = tk.Scrollbar(simple_error_frame)
