@@ -1,4 +1,14 @@
 if __name__ == "__main__":
+    import multiprocessing as mp
+    mp.freeze_support()
+    import tkinter.colorchooser as tkcc
+    import os
+    import sys
+    import pandas as pd
+    import numpy as np
+    import phototaxisPlotter
+    from functools import partial
+    import subprocess
     import tkinter as tk
     from tkinter import ttk, filedialog, messagebox
     from PIL import ImageTk, Image
@@ -27,34 +37,6 @@ if __name__ == "__main__":
 
             self.update()
 
-
-    root = tk.Tk()
-    try:
-        loading_screen = LoadingScreen(root)
-        root.geometry("380x400")
-        try:
-            root.iconbitmap("../../icon/leaning-tower-of-pisa.ico")
-        except:
-            try:
-                root.iconbitmap("icon/leaning-tower-of-pisa.ico")
-            except:
-                pass
-    except Exception:
-        messagebox.showerror("Critical error", "A critical error occurred while executing the program. See the message below for more details:\n\n"
-                             + traceback.format_exc())
-
-
-    import multiprocessing as mp
-    mp.freeze_support()
-    import tkinter.colorchooser as tkcc
-    import os
-    import sys
-    import pandas as pd
-    import numpy as np
-    import phototaxisPlotter
-    from functools import partial
-    import subprocess
-
     class Application(tk.Frame):
 
         def __init__(self, master=None):
@@ -75,7 +57,7 @@ if __name__ == "__main__":
             self.progress = self.manager.Value("i", 0.0)
             self.lock = self.manager.Lock()
             self.log_list = []
-            self.columns_index_list = {"All": 0}
+            self.columns_index_list = {"All": 1}
             self.cancel_analysis = False
             self.initWindow()
 
@@ -164,7 +146,7 @@ if __name__ == "__main__":
                         self.file.entryconfig("Remove compared files", state="normal")
                         self.input_list["All"]["file_names"].append(file_name)
                         self.input_list["All"]["path"].append(file)
-                        self.columns_index_list[file_name] = 0
+                        self.columns_index_list[file_name] = 1
                         self.input_list[file_name] = {"file_names": [file_name], "path": [file], "output": os.path.dirname(file) + "/",
                                                       "pointsize": 3, "startingpoint": 12, "datanumber": 5,
                                                       "minutepoint": -1, "period": "Both", "color": "#000000",
@@ -616,7 +598,7 @@ if __name__ == "__main__":
                         none_chosen = False
 
                 if(not none_chosen):
-                    self.columns_index_list[group_name] = 0
+                    self.columns_index_list[group_name] = 1
                     self.input_list[group_name] = {"file_names": true_files, "path": file_paths, "output": output, "pointsize": 3,
                                                    "startingpoint": 12,"datanumber": 5, "minutepoint": -1,
                                                    "period": "Both", "color": "#000000",
@@ -995,11 +977,22 @@ if __name__ == "__main__":
                  error_writer.write(traceback)
 
     try:
+        root = tk.Tk()
+        #loading_screen = LoadingScreen(root)
+        #root.geometry("380x400")
+        try:
+            root.iconbitmap("../../icon/leaning-tower-of-pisa.ico")
+        except:
+            try:
+                root.iconbitmap("icon/leaning-tower-of-pisa.ico")
+            except:
+                pass
+
         root.style = ttk.Style()
         root.style.theme_use("clam")
         root.style.configure("green.Horizontal.TProgressbar", foreground="green", background="green")
         Application(root)
-        loading_screen.destroy()
+        #loading_screen.destroy()
         root.mainloop()
     except Exception:
         messagebox.showerror("Critical error", "A critical error occurred while executing the program. See the message below for more details:\n\n"
