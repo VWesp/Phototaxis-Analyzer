@@ -274,7 +274,7 @@ def plotData(selected_group, input_list, highest_columns_index, progress, lock):
                                 time_points = x_y_values[file]["time_points"]
                                 new_plots_df["h"] = [str(s).replace(".", ",") for s in (time_points - 12)]
                                 new_plots_df["°C"] = ["-0,0"] * len(time_points)
-                                plt.title(str(i+1) + "\n" + selected_group)
+                                plt.title(str(i) + "\n" + selected_group)
                                 plt.xticks(x_y_values[file]["day_hours"], x_y_values[file]["time_point_labels"])
                                 plt.xlabel(input_list[file]["xlabel"])
                                 plt.ylabel("mV")
@@ -309,7 +309,7 @@ def plotData(selected_group, input_list, highest_columns_index, progress, lock):
                         max_modified_y = np.amax(modified_y)
                         min_modified_y = np.amin(modified_y)
                         modified_y_inverted = np.array((max_modified_y + min_modified_y) - modified_y)
-                        new_plots_df[i+1] = [str(s).replace(".", ",") for s in modified_y_inverted]
+                        new_plots_df[i] = [str(s).replace(".", ",") for s in modified_y_inverted]
                         legend_patch, = plt.plot(time_points, modified_y, color=input_list[selected_group]["merge_plots"]["color"], marker="o", linestyle="-",
                                         	     markersize=input_list[selected_group]["pointsize"], label="merged plot")
                         legend_patches.append(legend_patch)
