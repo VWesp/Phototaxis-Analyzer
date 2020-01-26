@@ -1,8 +1,8 @@
 #Log file of group: PhT64_32_2019-04-30_11-09-59_merged
 #<---------- file/group PhT64_32_2019-04-30_11-09-59_merged ---------->
 [file_names]	PhT64_32_2019-04-30_11-09-59_merged
-[path]	/home/valentin/git/Phototaxis-Analyzer/example/PhT64_32_2019-04-30_11-09-59_merged.txt
-[output]	/home/valentin/git/Phototaxis-Analyzer/example/
+[path]	C:/Users/valen/Desktop/git/Phototaxis-Analyzer/example/PhT64_32_2019-04-30_11-09-59_merged.txt
+[output]	C:/Users/valen/Desktop/git/Phototaxis-Analyzer/example/
 [pointsize]	3
 [startingpoint]	12
 [datanumber]	5

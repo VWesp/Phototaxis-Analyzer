@@ -19,13 +19,6 @@ def plotData(selected_group, input_list, highest_columns_index, progress, lock):
         if(not os.path.exists(input_list[selected_group]["output"])):
             os.makedirs(input_list[selected_group]["output"])
 
-        pdf_document = PdfPages(input_list[selected_group]["output"] + selected_group + ".pdf")
-        with open(input_list[selected_group]["output"] + "period_log.csv", "w") as period_writer:
-            period_writer.write("")
-
-        with open(input_list[selected_group]["output"] + "phase_log.csv", "w") as phase_writer:
-            phase_writer.write("")
-
         overall_minimum_period_list = []
         overall_minimum_phase_list = []
         overall_maximum_period_list = []
@@ -39,6 +32,7 @@ def plotData(selected_group, input_list, highest_columns_index, progress, lock):
         maximum_period_list = []
         maximum_phase_list = []
         x_y_values = {}
+        pdf_document = PdfPages(input_list[selected_group]["output"] + selected_group + ".pdf")
         for file in input_list[selected_group]["file_names"]:
             columns = list(input_list[file]["data"])[2:]
             settings = file
@@ -226,17 +220,17 @@ def plotData(selected_group, input_list, highest_columns_index, progress, lock):
             del plot_maximum_phase_list[:]
 
         if(input_list[selected_group]["period"] == "Minimum" or input_list[selected_group]["period"] == "Both"):
-            with open(input_list[selected_group]["output"] + "period_log.csv", "a") as period_writer:
+            with open(input_list[selected_group]["output"] + selected_group + "_period_log.csv", "w") as period_writer:
                 period_writer.write("Minimum\nSample;Period per day\n" + "\n".join(overall_minimum_period_list) + "\n\n")
 
-            with open(input_list[selected_group]["output"] + "phase_log.csv", "a") as phase_writer:
+            with open(input_list[selected_group]["output"] + selected_group + "_phase_log.csv", "w") as phase_writer:
                 phase_writer.write("Minimum\nSample;Phase;milliVolt\n" + "\n".join(overall_minimum_phase_list) + "\n\n")
 
         if(input_list[selected_group]["period"] == "Maximum" or input_list[selected_group]["period"] == "Both"):
-            with open(input_list[selected_group]["output"] + "period_log.csv", "a") as period_writer:
+            with open(input_list[selected_group]["output"]+ selected_group + "_period_log.csv", "w") as period_writer:
                 period_writer.write("Maximum\nSample;Period per day\n" + "\n".join(overall_maximum_period_list))
 
-            with open(input_list[selected_group]["output"] + "phase_log.csv", "a") as phase_writer:
+            with open(input_list[selected_group]["output"]+ selected_group + "_phase_log.csv", "w") as phase_writer:
                 phase_writer.write("Maximum\nSample;Phase;milliVolt\n" + "\n".join(overall_maximum_phase_list))
 
         del overall_minimum_period_list[:]
@@ -271,21 +265,16 @@ def plotData(selected_group, input_list, highest_columns_index, progress, lock):
                         x = x_y_values[file]["time_points"]
                         for column in columns:
                             y = x_y_values[file]["mean_values"][column]
-                            if(not input_list[selected_group]["merge_plots"]["on"]):
-                                color = next(colors)
-                                legend_patch, = plt.plot(x, y, label=file+"|"+column, marker="o", markersize=input_list[selected_group]["pointsize"],
-                                                         linestyle="-", color=color)
-                                legend_patches.append(legend_patch)
-                            else:
-                                merged_columns.append(y)
-                                legend_patches.append(mpatches.Patch(color=input_list[selected_group]["merge_plots"]["color"],
-                                                      label=file+"|"+column))
-
+                            color = next(colors)
+                            legend_patch, = plt.plot(x, y, label=file+"|"+column, marker="o", markersize=input_list[selected_group]["pointsize"],
+                                                     linestyle="-", color=color)
+                            legend_patches.append(legend_patch)
+                            merged_columns.append(y)
                             if(first_plot):
                                 time_points = x_y_values[file]["time_points"]
                                 new_plots_df["h"] = [str(s).replace(".", ",") for s in (time_points - 12)]
                                 new_plots_df["°C"] = ["-0,0"] * len(time_points)
-                                plt.title(str(i) + "\n" + selected_group)
+                                plt.title(str(i+1) + "\n" + selected_group)
                                 plt.xticks(x_y_values[file]["day_hours"], x_y_values[file]["time_point_labels"])
                                 plt.xlabel(input_list[file]["xlabel"])
                                 plt.ylabel("mV")
@@ -301,12 +290,8 @@ def plotData(selected_group, input_list, highest_columns_index, progress, lock):
 
                                 first_plot = False
 
-                            if(input_list[selected_group]["merge_plots"]["on"]):
-                                with lock:
-                                    progress.value += 0.5
-                            else:
-                                with lock:
-                                    progress.value += 1
+                            with lock:
+                                progress.value += 1
 
                     if(input_list[selected_group]["merge_plots"]["on"]):
                         np_merged_columns = np.asarray(merged_columns)
@@ -319,14 +304,15 @@ def plotData(selected_group, input_list, highest_columns_index, progress, lock):
                             avg_mod_column_data = np.mean(mod_column_data)
                             modified_y.append(avg_mod_column_data)
                             with lock:
-                                progress.value += 0.5
+                                progress.value += 1
 
                         max_modified_y = np.amax(modified_y)
                         min_modified_y = np.amin(modified_y)
                         modified_y_inverted = np.array((max_modified_y + min_modified_y) - modified_y)
                         new_plots_df[i+1] = [str(s).replace(".", ",") for s in modified_y_inverted]
-                        plt.plot(time_points, modified_y, color=input_list[selected_group]["merge_plots"]["color"], marker="o", linestyle="-",
-                                 markersize=input_list[selected_group]["pointsize"])
+                        legend_patch, = plt.plot(time_points, modified_y, color=input_list[selected_group]["merge_plots"]["color"], marker="o", linestyle="-",
+                                        	     markersize=input_list[selected_group]["pointsize"], label="merged plot")
+                        legend_patches.append(legend_patch)
                         del merged_columns[:]
                         del modified_y[:]
 

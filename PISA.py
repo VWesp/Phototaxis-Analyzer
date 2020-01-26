@@ -1,19 +1,8 @@
 if __name__ == "__main__":
-    import multiprocessing as mp
-    mp.freeze_support()
     import tkinter as tk
     from tkinter import ttk, filedialog, messagebox
     from PIL import ImageTk, Image
-    import tkinter.colorchooser as tkcc
-    import os
-    import sys
-    import pandas as pd
-    import numpy as np
-    import phototaxisPlotter
-    from functools import partial
-    import subprocess
     import traceback
-
 
     class LoadingScreen(tk.Toplevel):
 
@@ -38,6 +27,33 @@ if __name__ == "__main__":
 
             self.update()
 
+
+    root = tk.Tk()
+    try:
+        loading_screen = LoadingScreen(root)
+        root.geometry("380x400")
+        try:
+            root.iconbitmap("../../icon/leaning-tower-of-pisa.ico")
+        except:
+            try:
+                root.iconbitmap("icon/leaning-tower-of-pisa.ico")
+            except:
+                pass
+    except Exception:
+        messagebox.showerror("Critical error", "A critical error occurred while executing the program. See the message below for more details:\n\n"
+                             + traceback.format_exc())
+
+
+    import multiprocessing as mp
+    mp.freeze_support()
+    import tkinter.colorchooser as tkcc
+    import os
+    import sys
+    import pandas as pd
+    import numpy as np
+    import phototaxisPlotter
+    from functools import partial
+    import subprocess
 
     class Application(tk.Frame):
 
@@ -207,6 +223,9 @@ if __name__ == "__main__":
 
             for file,column_set in self.input_list[self.file_options_var.get()]["set_columns"].items():
                 progress_end += len(column_set)
+
+            if(self.input_list[self.file_options_var.get()]["merge_plots"]["on"]):
+                progress_end += len(self.input_list[files[0]]["data"][list(self.input_list[files[0]]["data"])[2:][0]]) / self.input_list[files[0]]["data_per_measurement"]
 
             pool = mp.Pool(processes=1)
             pool_map = partial(phototaxisPlotter.plotData, input_list=self.input_list, progress=self.progress,
@@ -976,17 +995,6 @@ if __name__ == "__main__":
                  error_writer.write(traceback)
 
     try:
-        root = tk.Tk()
-        loading_screen = LoadingScreen(root)
-        root.geometry("380x400")
-        try:
-            root.iconbitmap("../../icon/leaning-tower-of-pisa.ico")
-        except:
-            try:
-                root.iconbitmap("icon/leaning-tower-of-pisa.ico")
-            except:
-                pass
-
         root.style = ttk.Style()
         root.style.theme_use("clam")
         root.style.configure("green.Horizontal.TProgressbar", foreground="green", background="green")
