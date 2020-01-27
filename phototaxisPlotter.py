@@ -297,10 +297,10 @@ def plotData(selected_group, input_list, highest_columns_index, progress, lock):
                         np_merged_columns = np.asarray(merged_columns)
                         for index in range(len(np_merged_columns[0])):
                             column_data = np.asarray(np_merged_columns[:,index])
-                            column_data_median = np.abs(column_data - np.median(column_data))
-                            mad = np.median(column_data_median)
-                            modified_z = (0.6745 * column_data_median) / (mad if mad else 1)
-                            mod_column_data = column_data[modified_z<=input_list[selected_group]["merge_plots"]["threshold"]]
+                            column_data_median = column_data - np.median(column_data)
+                            mad = np.median(np.abs(column_data_median))
+                            modified_z = (0.6745 * column_data_median) / mad
+                            mod_column_data = column_data[np.abs(modified_z)<=input_list[selected_group]["merge_plots"]["threshold"]]
                             avg_mod_column_data = np.mean(mod_column_data)
                             modified_y.append(avg_mod_column_data)
                             with lock:
