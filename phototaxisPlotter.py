@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib.pyplot import cm
 from matplotlib.backends.backend_pdf import PdfPages
-
 import pandas as pd
 import traceback
 import datetime
@@ -32,6 +31,8 @@ def plotData(selected_group, input_list, highest_columns_index, progress, lock):
         maximum_period_list = []
         maximum_phase_list = []
         x_y_values = {}
+        valleys = []
+        peaks = []
         pdf_document = PdfPages(input_list[selected_group]["output"] + selected_group + ".pdf")
         for file in input_list[selected_group]["file_names"]:
             columns = list(input_list[file]["data"])[2:]
@@ -117,7 +118,26 @@ def plotData(selected_group, input_list, highest_columns_index, progress, lock):
                     time_index_end = np.where(time_points == day_end)[0][0]
                     day_data = data_inverted_mean[time_index_start:time_index_end+1]
                     daytime_points = time_points[time_index_start:time_index_end+1]
-                    valleys, peaks = findPeaksAndValleys(day_data, points)
+                    if(len(day_data) > points*2):
+                        for i in range(points, len(day_data)-points, 1):
+                            valley_found = True
+                            for j in range(1, points+1, 1):
+                                if(day_data[i] > day_data[i-j] or day_data[i] > day_data[i+j]):
+                                    valley_found = False
+                                    break
+
+                            if(valley_found):
+                                valleys.append(i)
+
+                            peak_found = True
+                            for j in range(1, points+1, 1):
+                                if(day_data[i] < day_data[i-j] or day_data[i] < day_data[i+j]):
+                                    peak_found = False
+                                    break
+
+                            if(peak_found):
+                                peaks.append(i)
+
                     if(len(valleys) and (input_list[settings]["period"] == "Minimum" or input_list[settings]["period"] == "Both")):
                         if(not ((input_list[settings]["minimum"]["exclude_firstday"] and day == 0)
                                  or (input_list[settings]["minimum"]["exclude_lastday"] and day_end == time_points[-1]))):
@@ -183,6 +203,9 @@ def plotData(selected_group, input_list, highest_columns_index, progress, lock):
                             plt.plot([mean_time, mean_time], [top, bottom], color="black", linestyle="-")
                             maximum_phase_list.append(str(mean_time%24).replace(".", ",") + ";" + str(meanPeak).replace(".", ","))
                             last_peak = mean_time
+
+                    del valleys[:]
+                    del peaks[:]
 
                 plot_minimum_period_list.append(column + ";" + ";".join(minimum_period_list))
                 plot_minimum_phase_list.append(column + ";" + "\n;".join(minimum_phase_list))
@@ -294,8 +317,9 @@ def plotData(selected_group, input_list, highest_columns_index, progress, lock):
                                 progress.value += 1
 
                     if(input_list[selected_group]["merge_plots"]["on"]):
+                        longest_column = max(merged_columns, key=len)
                         np_merged_columns = np.asarray(merged_columns)
-                        for index in range(len(np_merged_columns[0])):
+                        for index in range(len(longest_column)):
                             column_data = np.asarray(np_merged_columns[:,index])
                             column_data_median = column_data - np.median(column_data)
                             mad = np.median(np.abs(column_data_median))
@@ -338,33 +362,6 @@ def plotData(selected_group, input_list, highest_columns_index, progress, lock):
         return
     except:
         return traceback.format_exc()
-
-
-
-def findPeaksAndValleys(y, points):
-    valleys = []
-    peaks = []
-    if(len(y) > points*2):
-        for i in range(points, len(y)-points, 1):
-            valley_found = True
-            for j in range(1, points+1, 1):
-                if(y[i] > y[i-j] or y[i] > y[i+j]):
-                    valley_found = False
-                    break
-
-            if(valley_found):
-                valleys.append(i)
-
-            peak_found = True
-            for j in range(1, points+1, 1):
-                if(y[i] < y[i-j] or y[i] < y[i+j]):
-                    peak_found = False
-                    break
-
-            if(peak_found):
-                peaks.append(i)
-
-    return (valleys, peaks)
 
 
 

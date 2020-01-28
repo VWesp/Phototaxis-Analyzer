@@ -50,7 +50,7 @@ if __name__ == "__main__":
                                       "data_per_measurement": sys.maxsize, "timepoint_indices": [],
                                       "data_minutepoints": sys.maxsize, "set_columns": {}, "dn_cycle": {"on": True,
                                       "background": "#929591", "visibility": 50}, "set_settings": False,
-                                      "merge_plots": {"on": False, "threshold": 3.5, "color": "#000000"}}
+                                      "merge_plots": {"on": True, "threshold": 3.5, "color": "#000000"}}
             tk.Frame.__init__(self, master)
             self.master = master
             self.manager = mp.Manager()
@@ -155,7 +155,7 @@ if __name__ == "__main__":
                                                       "xlabel": "Days", "sg_filter": {"on": False, "window": 11, "poly": 3,
                                                       "color": "#800000"}, "pv_points": 1, "pv_amp_per": 3, "dn_cycle": {"on": True,
                                                       "background": "#929591", "visibility": 50}, "set_columns": {}, "set_settings": False,
-                                                      "merge_plots": {"on": False, "threshold": 3.5, "color": "#000000"}}
+                                                      "merge_plots": {"on": True, "threshold": 3.5, "color": "#000000"}}
                         file_options_list.append(file_name)
                         self.file_options.set_menu(*file_options_list)
                         self.file_options_var.set(file_name)
@@ -206,8 +206,23 @@ if __name__ == "__main__":
             for file,column_set in self.input_list[self.file_options_var.get()]["set_columns"].items():
                 progress_end += len(column_set)
 
-            if(self.input_list[self.file_options_var.get()]["merge_plots"]["on"]):
+            if(len(list(self.input_list[self.file_options_var.get()]["set_columns"].keys())) and self.input_list[self.file_options_var.get()]["merge_plots"]["on"]):
+                num_data_points = len(self.input_list[files[0]]["data"][list(self.input_list[files[0]]["data"])[2:][0]])
+                for file in files:
+                    current_num_data_points = len(self.input_list[file]["data"][list(self.input_list[file]["data"])[2:][0]])
+                    if(num_data_points != current_num_data_points):
+                        error_output = self.input_list[self.file_options_var.get()]["output"]
+                        self.showErrorWindow("Analysis error", "An error occurred while initializing the analysis.\n"
+                                             "To fix the problem, change files or turn off the 'Merge set plots/columns' option.",
+                                             "The file '" + file + "' has a different number of data points than the rest of the files.\n"
+                                             "Previous number of data points: " + str(num_data_points) + "\n"
+                                             "'" + file + "' number of data points: " + str(current_num_data_points),
+                                             error_output)
+                        self.cancel_analysis = True
+                        break
+
                 progress_end += len(self.input_list[files[0]]["data"][list(self.input_list[files[0]]["data"])[2:][0]]) / self.input_list[files[0]]["data_per_measurement"]
+
 
             pool = mp.Pool(processes=1)
             pool_map = partial(phototaxisPlotter.plotData, input_list=self.input_list, progress=self.progress,
@@ -233,7 +248,7 @@ if __name__ == "__main__":
             pool.join()
             self.status_var.set("Status: Analysis finished/stopped.")
             self.enableMenus()
-            if(not self.cancel_analysis and not error):
+            if(not self.cancel_analysis and (not error or single_plots_pdf.get()[0] == None)):
                 self.status_var.set("Status: Analysis finished.")
                 if(os.name == "nt"):
                     os.startfile(self.input_list[self.file_options_var.get()]["output"])
@@ -249,7 +264,7 @@ if __name__ == "__main__":
 
                 with open(self.input_list[self.file_options_var.get()]["output"] + "log.txt", "w") as log_writer:
                     log_writer.write("#Log file of group: " + self.file_options_var.get() + "\n" + "\n".join(self.log_list))
-            elif(not self.cancel_analysis and error):
+            elif(not self.cancel_analysis and error and single_plots_pdf.get()[0] != None):
                 self.status_var.set("Status: Error during analysis.")
                 self.showErrorWindow("Analysis error", "An error occurred while running the analysis.",
                                      single_plots_pdf.get()[0], self.input_list[self.file_options_var.get()]["output"])
@@ -610,7 +625,7 @@ if __name__ == "__main__":
                                                    "timepoint_indices": timepoint_indices, "set_columns": {},
                                                    "data_minutepoints": data_minutepoints, "dn_cycle": {"on": True,
                                                    "background": "#929591", "visibility": 50}, "set_settings": False,
-                                                   "merge_plots": {"on": False, "threshold": 3.5, "color": "#000000"}}
+                                                   "merge_plots": {"on": True, "threshold": 3.5, "color": "#000000"}}
                     self.file_options.set_menu(*file_list)
                     self.file_options_var.set(group_name)
                     self.file.entryconfig("Remove compared files", state="normal")
@@ -986,7 +1001,10 @@ if __name__ == "__main__":
             try:
                 root.iconbitmap("icon/leaning-tower-of-pisa.ico")
             except:
-                pass
+                try:
+                    root.iconbitmap("leaning-tower-of-pisa.ico")
+                except:
+                    pass
 
         root.style = ttk.Style()
         root.style.theme_use("clam")
