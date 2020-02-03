@@ -164,7 +164,15 @@ if __name__ == "__main__":
                             data[column] = data[column].str.replace(",", ".").astype(float)
                             data_int = data[column].astype(int)
                             if(column == "h"):
-                                self.input_list[file_name]["data_per_measurement"] = np.argmax(np.array(data_int > 0))
+                                measurements = np.unique(data_int, return_counts=True)
+                                for i in range(1, len(measurements[1])):
+                                    if(measurements[1][i] != measurements[1][0]):
+                                        raise Exception("Different number of measurements found:\nTime point '" + str(measurements[0][0]) + "'"
+                                                        " number of measurements: " + str(measurements[1][0]) + "\n"
+                                                        "Time point '" + str(measurements[0][i]) + "' unfitting"
+                                                        " number of measurements: " + str(measurements[1][i]))
+
+                                self.input_list[file_name]["data_per_measurement"] = measurements[1][0]
                                 self.input_list[file_name]["timepoint_indices"] = np.arange(
                                                             self.input_list[file_name]["data_per_measurement"],
                                                             len(data[column]),

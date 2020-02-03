@@ -143,9 +143,8 @@ def plotData(selected_group, input_list, highest_columns_index, progress, lock):
                                  or (input_list[settings]["minimum"]["exclude_lastday"] and day_end == time_points[-1]))):
                             valley = None
                             smallest_valley = sys.float_info.max
-                            valleys.reverse()
                             for i in valleys:
-                                if(day_data[i] < smallest_valley):
+                                if(day_data[i] <= smallest_valley):
                                     smallest_valley = day_data[i]
                                     valley = i
 
@@ -217,16 +216,23 @@ def plotData(selected_group, input_list, highest_columns_index, progress, lock):
                 del maximum_phase_list[:]
 
                 props = dict(boxstyle='round', facecolor='white', alpha=0.15)
-                if(input_list[settings]["period"] == "Minimum"):
+                if(input_list[settings]["period"] == "Minimum" and minimum_periods != 0):
                     plt.gcf().text(0.955, 0.5, "mean min period: " + "{0:.2f}".format(mean_minimum_period / minimum_periods) + "h",
                                    bbox=props)
-                elif(input_list[settings]["period"] == "Maximum"):
+                elif(input_list[settings]["period"] == "Maximum" and maximum_periods != 0):
                     plt.gcf().text(0.955, 0.5, "mean max period: " + "{0:.2f}".format(mean_maximum_period / maximum_periods) + "h",
                                   bbox=props)
                 else:
-                    plt.gcf().text(0.955, 0.5, "mean max period: " + "{0:.2f}".format(mean_maximum_period / maximum_periods) +
-                                   "h\n\n" + "mean min period: " + "{0:.2f}".format(mean_minimum_period / minimum_periods) + "h",
-                                   bbox=props)
+                    if(minimum_periods == 0 and maximum_periods != 0):
+                        plt.gcf().text(0.955, 0.5, "mean max period: " + "{0:.2f}".format(mean_maximum_period / maximum_periods) + "h",
+                                      bbox=props)
+                    elif(maximum_periods == 0 and minimum_periods != 0):
+                        plt.gcf().text(0.955, 0.5, "mean min period: " + "{0:.2f}".format(mean_minimum_period / minimum_periods) + "h",
+                                       bbox=props)
+                    elif(minimum_periods != 0 and maximum_periods != 0):
+                        plt.gcf().text(0.955, 0.5, "mean max period: " + "{0:.2f}".format(mean_maximum_period / maximum_periods) +
+                                       "h\n\n" + "mean min period: " + "{0:.2f}".format(mean_minimum_period / minimum_periods) + "h",
+                                       bbox=props)
 
                 pdf_document.savefig(figure, bbox_inches="tight")
                 plt.close()
