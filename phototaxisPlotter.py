@@ -18,6 +18,12 @@ def plotData(selected_group, input_list, highest_columns_index, progress, lock):
         if(not os.path.exists(input_list[selected_group]["output"])):
             os.makedirs(input_list[selected_group]["output"])
 
+        with open(input_list[selected_group]["output"] + selected_group + "_period_log.csv", "w") as period_writer:
+            period_writer.write("")
+
+        with open(input_list[selected_group]["output"]+ selected_group + "_phase_log.csv", "w") as phase_writer:
+            phase_writer.write("")
+
         overall_minimum_period_list = []
         overall_minimum_phase_list = []
         overall_maximum_period_list = []
@@ -249,17 +255,17 @@ def plotData(selected_group, input_list, highest_columns_index, progress, lock):
             del plot_maximum_phase_list[:]
 
         if(input_list[selected_group]["period"] == "Minimum" or input_list[selected_group]["period"] == "Both"):
-            with open(input_list[selected_group]["output"] + selected_group + "_period_log.csv", "w") as period_writer:
+            with open(input_list[selected_group]["output"] + selected_group + "_period_log.csv", "a") as period_writer:
                 period_writer.write("Minimum\nSample;Period per day\n" + "\n".join(overall_minimum_period_list) + "\n\n")
 
-            with open(input_list[selected_group]["output"] + selected_group + "_phase_log.csv", "w") as phase_writer:
+            with open(input_list[selected_group]["output"] + selected_group + "_phase_log.csv", "a") as phase_writer:
                 phase_writer.write("Minimum\nSample;Phase;milliVolt\n" + "\n".join(overall_minimum_phase_list) + "\n\n")
 
         if(input_list[selected_group]["period"] == "Maximum" or input_list[selected_group]["period"] == "Both"):
-            with open(input_list[selected_group]["output"]+ selected_group + "_period_log.csv", "w") as period_writer:
+            with open(input_list[selected_group]["output"]+ selected_group + "_period_log.csv", "a") as period_writer:
                 period_writer.write("Maximum\nSample;Period per day\n" + "\n".join(overall_maximum_period_list))
 
-            with open(input_list[selected_group]["output"]+ selected_group + "_phase_log.csv", "w") as phase_writer:
+            with open(input_list[selected_group]["output"]+ selected_group + "_phase_log.csv", "a") as phase_writer:
                 phase_writer.write("Maximum\nSample;Phase;milliVolt\n" + "\n".join(overall_maximum_phase_list))
 
         del overall_minimum_period_list[:]
@@ -302,7 +308,7 @@ def plotData(selected_group, input_list, highest_columns_index, progress, lock):
                             if(first_plot):
                                 time_points = x_y_values[file]["time_points"]
                                 new_plots_df["h"] = [str(s).replace(".", ",") for s in (time_points - 12)]
-                                new_plots_df["°C"] = ["-0,0"] * len(time_points)
+                                new_plots_df["°C"] = ["-1000000,000000"] * len(time_points)
                                 plt.title(str(i) + "\n" + selected_group)
                                 plt.xticks(x_y_values[file]["day_hours"], x_y_values[file]["time_point_labels"])
                                 plt.xlabel(input_list[file]["xlabel"])

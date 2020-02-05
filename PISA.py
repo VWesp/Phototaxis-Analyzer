@@ -247,12 +247,12 @@ if __name__ == "__main__":
                 if(self.progress.value == 0):
                     self.status_var.set("Status: Starting threads...")
                 else:
-                    self.status_var.set("Status: Analyzing...")
+                    self.status_var.set("Status: Analysis progress: " + "{0:.2f}".format(self.progress.value * (100.0/progress_end)) + "%")
 
-                self.progressbar.set(self.progress.value * (100/progress_end))
+                self.progressbar.set(self.progress.value * (100.0/progress_end))
                 self.update()
 
-            self.progressbar.set(self.progress.value * (100/progress_end))
+            self.progressbar.set(self.progress.value * (100.0/progress_end))
             pool.join()
             self.status_var.set("Status: Analysis finished/stopped.")
             self.enableMenus()
