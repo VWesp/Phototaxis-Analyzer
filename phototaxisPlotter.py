@@ -75,15 +75,17 @@ def plotData(selected_group, input_list, highest_columns_index, progress, lock):
                     data_inverted_per_timepoint = np.array(np.split(data_inverted, input_list[file]["timepoint_indices"]))
                     data_inverted_mean = np.mean(data_inverted_per_timepoint[:,-input_list[settings]["datanumber"]:],
                                                  axis=1)
-
+                data_inverted_mean_smoothed = signal.savgol_filter(data_inverted_mean,
+                                                                   input_list[settings]["sg_filter"]["window"],
+                                                                   input_list[settings]["sg_filter"]["poly"])
+                data_inverted_mean_smoothed = signal.savgol_filter(data_inverted_mean_smoothed,
+                                                                   input_list[settings]["sg_filter"]["window"],
+                                                                   input_list[settings]["sg_filter"]["poly"])
                 x_y_values[file]["mean_values"][column] = data_inverted_mean
                 figure = plt.figure()
                 plt.plot(time_points, data_inverted_mean, marker="o", markersize=input_list[settings]["pointsize"],
                          color=input_list[settings]["color"], linestyle="-", label="raw data")
                 if(input_list[settings]["sg_filter"]["on"]):
-                    data_inverted_mean_smoothed = signal.savgol_filter(data_inverted_mean,
-                                                                       input_list[settings]["sg_filter"]["window"],
-                                                                       input_list[settings]["sg_filter"]["poly"])
                     plt.plot(time_points, data_inverted_mean_smoothed, color=input_list[settings]["sg_filter"]["color"],
                              linestyle="-", label="smoothed data")
                     plt.legend(bbox_to_anchor=(1.05,0.40))
@@ -92,122 +94,175 @@ def plotData(selected_group, input_list, highest_columns_index, progress, lock):
                 plt.xticks(hours, time_point_labels)
                 plt.xlabel(input_list[settings]["xlabel"])
                 plt.ylabel("mV")
-                threshold = (max_voltage - min_voltage) * (input_list[settings]["pv_amp_per"] / 100)
-                last_valley = None
-                last_peak = None
                 mean_minimum_period = 0
                 minimum_periods = 0
                 mean_maximum_period = 0
                 maximum_periods = 0
                 points = input_list[settings]["pv_points"]
-                for day in hours:
-                    day_start = (day + (input_list[settings]["startingpoint"] % 2)) - (2 * points)
-                    day_end = (day + (input_list[settings]["startingpoint"] % 2)) + (22 + (2 * points))
-                    if(input_list[settings]["dn_cycle"]["on"]):
-                        plt.axvspan(day_end-12, day_end, facecolor=input_list[settings]["dn_cycle"]["background"],
-                                    alpha=float(input_list[settings]["dn_cycle"]["visibility"])/100)
+                if(input_list[settings]["sg_filter"]["period"]):
+                    for day in hours:
+                        day_start = (day + (input_list[settings]["startingpoint"] % 2)) - (2 * points)
+                        day_end = (day + (input_list[settings]["startingpoint"] % 2)) + (22 + (2 * points))
+                        if(input_list[settings]["dn_cycle"]["on"]):
+                            plt.axvspan(day_end-12, day_end, facecolor=input_list[settings]["dn_cycle"]["background"],
+                                        alpha=float(input_list[settings]["dn_cycle"]["visibility"])/100)
+                        if(day != 0):
+                            if(input_list[settings]["period"] == "Minimum"):
+                                plt.axvline(day, ymin=0.1, color="black", linestyle=":")
+                            elif(input_list[settings]["period"] == "Maximum"):
+                                plt.axvline(day, ymax=0.9, color="black", linestyle=":")
+                            elif(input_list[settings]["period"] == "Both"):
+                                plt.axvline(day, ymin=0.1, ymax=0.9, color="black", linestyle=":")
 
-                    if(day == 0):
-                        day_start = input_list[settings]["startingpoint"]
-                    else:
-                        if(input_list[settings]["period"] == "Minimum"):
-                            plt.axvline(day, ymin=0.1, color="black", linestyle=":")
-                        elif(input_list[settings]["period"] == "Maximum"):
-                            plt.axvline(day, ymax=0.9, color="black", linestyle=":")
-                        elif(input_list[settings]["period"] == "Both"):
-                            plt.axvline(day, ymin=0.1, ymax=0.9, color="black", linestyle=":")
-
-                    if(not day_end in time_points):
-                        day_end = time_points[-1]
-
-                    time_index_start = np.where(time_points == day_start)[0][0]
-                    time_index_end = np.where(time_points == day_end)[0][0]
-                    day_data = data_inverted_mean[time_index_start:time_index_end+1]
-                    daytime_points = time_points[time_index_start:time_index_end+1]
-                    if(len(day_data) > points*2):
-                        for i in range(points, len(day_data)-points, 1):
-                            valley_found = True
-                            for j in range(1, points+1, 1):
-                                if(day_data[i] > day_data[i-j] or day_data[i] > day_data[i+j]):
-                                    valley_found = False
-                                    break
-
-                            if(valley_found):
-                                valleys.append(i)
-
-                            peak_found = True
-                            for j in range(1, points+1, 1):
-                                if(day_data[i] < day_data[i-j] or day_data[i] < day_data[i+j]):
-                                    peak_found = False
-                                    break
-
-                            if(peak_found):
-                                peaks.append(i)
-
-                    if(len(valleys) and (input_list[settings]["period"] == "Minimum" or input_list[settings]["period"] == "Both")):
-                        if(not ((input_list[settings]["minimum"]["exclude_firstday"] and day == 0)
-                                 or (input_list[settings]["minimum"]["exclude_lastday"] and day_end == time_points[-1]))):
-                            valley = None
-                            smallest_valley = sys.float_info.max
-                            for i in valleys:
-                                if(day_data[i] <= smallest_valley):
-                                    smallest_valley = day_data[i]
-                                    valley = i
-
-                            mean_time = None
-                            mean_valley = None
-                            if(day == 0):
-                                mean_time, mean_valley = calculatePeakAndValleyMean(daytime_points[:-points], day_data[:-points],
-                                                                                    valley, threshold, "min")
-                            else:
-                                mean_time, mean_valley = calculatePeakAndValleyMean(daytime_points[points:-points],
-                                                                                    day_data[points:-points], valley-points,
-                                                                                    threshold, "min")
-                            if(last_valley != None):
-                                bottom_line = min_voltage - (max_voltage - min_voltage) * 0.1
-                                plt.plot([mean_time, last_valley], [bottom_line, bottom_line], color="black", linestyle="-")
-                                plt.annotate(str(mean_time-last_valley).replace(".", ",") + "h", xy=((mean_time+last_valley)/2, 0.04),
-                                             xycoords=("data","axes fraction"), size=10, ha="center")
-                                minimum_period_list.append(str(mean_time-last_valley).replace(".", ","))
-                                mean_minimum_period += mean_time - last_valley
-                                minimum_periods += 1
-
-                            top = min_voltage - (max_voltage - min_voltage) * 0.15
-                            bottom = min_voltage - (max_voltage - min_voltage) * 0.05
-                            plt.plot([mean_time, mean_time], [top, bottom], color="black", linestyle="-")
-                            minimum_phase_list.append(str(mean_time%24).replace(".", ",") + ";" + str(mean_valley).replace(".", ","))
-                            last_valley = mean_time
-                    if(len(peaks) and (input_list[settings]["period"] == "Maximum" or input_list[settings]["period"] == "Both")):
-                        if(not ((input_list[settings]["maximum"]["exclude_firstday"] and day == 0)
-                                 or (input_list[settings]["maximum"]["exclude_lastday"] and day_end == time_points[-1]))):
-                            peak = None
-                            highest_peak = 0
-                            for i in peaks:
-                                if(day_data[i] > highest_peak):
-                                    highest_peak = day_data[i]
-                                    peak = i
-
-                            if(day_end == time_points[-1]):
-                                mean_time, meanPeak = calculatePeakAndValleyMean(daytime_points[points:], day_data[points:],
-                                                                                 peak-points, threshold, "max")
-                            else:
-                                mean_time, meanPeak = calculatePeakAndValleyMean(daytime_points[points:-points],
-                                                                                 day_data[points:-points], peak-points,
-                                                                                 threshold, "max")
-                            if(last_peak != None):
-                                topLine = max_voltage + (max_voltage - min_voltage) * 0.1
-                                plt.plot([mean_time, last_peak], [topLine, topLine], color="black", linestyle="-")
-                                plt.annotate(str(mean_time-last_peak).replace(".", ",") + "h", xy=((mean_time+last_peak)/2, 0.93),
-                                             xycoords=("data","axes fraction"), size=10, ha="center")
-                                maximum_period_list.append(str(mean_time-last_peak).replace(".", ","))
-                                mean_maximum_period += mean_time - last_peak
-                                maximum_periods += 1
-
+                    if(input_list[settings]["period"] == "Maximum" or input_list[settings]["period"] == "Both"):
+                        peaks = time_points[signal.find_peaks(data_inverted_mean_smoothed)[0]]
+                        if(len(peaks)):
                             top = max_voltage + (max_voltage - min_voltage) * 0.15
                             bottom = max_voltage + (max_voltage - min_voltage) * 0.05
-                            plt.plot([mean_time, mean_time], [top, bottom], color="black", linestyle="-")
-                            maximum_phase_list.append(str(mean_time%24).replace(".", ",") + ";" + str(meanPeak).replace(".", ","))
-                            last_peak = mean_time
+                            top_line = max_voltage + (max_voltage - min_voltage) * 0.1
+                            plt.plot([peaks[0], peaks[-1]], [top_line, top_line], color="black", linestyle="-")
+                            for i in range(len(peaks)):
+                                plt.plot([peaks[i], peaks[i]], [top, bottom], color="black", linestyle="-")
+                                maximum_phase_list.append(str(peaks[i]%24).replace(".", ",") + ";" + str(data_inverted_mean_smoothed[i]).replace(".", ","))
+                                if(i != 0):
+                                    plt.annotate(str(peaks[i]-peaks[i-1]).replace(".", ",") + "h",
+                                                 xy=((peaks[i]+peaks[i-1])/2, 0.93),
+                                                 xycoords=("data","axes fraction"), size=10, ha="center")
+                                    maximum_period_list.append(str(peaks[i]-peaks[i-1]).replace(".", ","))
+                                    mean_maximum_period += peaks[i] - peaks[i-1]
+                                    maximum_periods += 1
+
+                        if(input_list[settings]["period"] == "Minimum" or input_list[settings]["period"] == "Both"):
+                            valleys = time_points[signal.find_peaks(data_inverted_mean_smoothed*-1)[0]]
+                            if(len(valleys)):
+                                top = min_voltage - (max_voltage - min_voltage) * 0.15
+                                bottom = min_voltage - (max_voltage - min_voltage) * 0.05
+                                bottom_line = min_voltage - (max_voltage - min_voltage) * 0.1
+                                plt.plot([valleys[0], valleys[-1]], [bottom_line, bottom_line], color="black", linestyle="-")
+                                for i in range(len(valleys)):
+                                    plt.plot([valleys[i], valleys[i]], [top, bottom], color="black", linestyle="-")
+                                    minimum_phase_list.append(str(valleys[i]%24).replace(".", ",") + ";" + str(data_inverted_mean_smoothed[i]).replace(".", ","))
+                                    if(i != 0):
+                                        plt.annotate(str(valleys[i]-valleys[i-1]).replace(".", ",") + "h",
+                                                     xy=((valleys[i]+valleys[i-1])/2, 0.04),
+                                                     xycoords=("data","axes fraction"), size=10, ha="center")
+                                        minimum_period_list.append(str(valleys[i]-valleys[i-1]).replace(".", ","))
+                                        mean_minimum_period += valleys[i] - valleys[i-1]
+                                        minimum_periods += 1
+                else:
+                    threshold = (max_voltage - min_voltage) * (input_list[settings]["pv_amp_per"] / 100)
+                    last_valley = None
+                    last_peak = None
+                    for day in hours:
+                        valleys = []
+                        peaks = []
+                        day_start = (day + (input_list[settings]["startingpoint"] % 2)) - (2 * points)
+                        day_end = (day + (input_list[settings]["startingpoint"] % 2)) + (22 + (2 * points))
+                        if(input_list[settings]["dn_cycle"]["on"]):
+                            plt.axvspan(day_end-12, day_end, facecolor=input_list[settings]["dn_cycle"]["background"],
+                                        alpha=float(input_list[settings]["dn_cycle"]["visibility"])/100)
+
+                        if(day == 0):
+                            day_start = input_list[settings]["startingpoint"]
+                        else:
+                            if(input_list[settings]["period"] == "Minimum"):
+                                plt.axvline(day, ymin=0.1, color="black", linestyle=":")
+                            elif(input_list[settings]["period"] == "Maximum"):
+                                plt.axvline(day, ymax=0.9, color="black", linestyle=":")
+                            elif(input_list[settings]["period"] == "Both"):
+                                plt.axvline(day, ymin=0.1, ymax=0.9, color="black", linestyle=":")
+
+                        if(not day_end in time_points):
+                            day_end = time_points[-1]
+
+                        time_index_start = np.where(time_points == day_start)[0][0]
+                        time_index_end = np.where(time_points == day_end)[0][0]
+                        day_data = data_inverted_mean[time_index_start:time_index_end+1]
+                        daytime_points = time_points[time_index_start:time_index_end+1]
+                        if(len(day_data) > points*2):
+                            for i in range(points, len(day_data)-points, 1):
+                                valley_found = True
+                                for j in range(1, points+1, 1):
+                                    if(day_data[i] > day_data[i-j] or day_data[i] > day_data[i+j]):
+                                        valley_found = False
+                                        break
+
+                                if(valley_found):
+                                    valleys.append(i)
+
+                                peak_found = True
+                                for j in range(1, points+1, 1):
+                                    if(day_data[i] < day_data[i-j] or day_data[i] < day_data[i+j]):
+                                        peak_found = False
+                                        break
+
+                                if(peak_found):
+                                    peaks.append(i)
+
+                        if(len(peaks) and (input_list[settings]["period"] == "Maximum" or input_list[settings]["period"] == "Both")):
+                            if(not ((input_list[settings]["maximum"]["exclude_firstday"] and day == 0)
+                                     or (input_list[settings]["maximum"]["exclude_lastday"] and day_end == time_points[-1]))):
+                                peak = None
+                                highest_peak = 0
+                                for i in peaks:
+                                    if(day_data[i] > highest_peak):
+                                        highest_peak = day_data[i]
+                                        peak = i
+
+                                if(day_end == time_points[-1]):
+                                    mean_time, meanPeak = calculatePeakAndValleyMean(daytime_points[points:], day_data[points:],
+                                                                                     peak-points, threshold, "max")
+                                else:
+                                    mean_time, meanPeak = calculatePeakAndValleyMean(daytime_points[points:-points],
+                                                                                     day_data[points:-points], peak-points,
+                                                                                     threshold, "max")
+                                if(last_peak != None):
+                                    top_line = max_voltage + (max_voltage - min_voltage) * 0.1
+                                    plt.plot([mean_time, last_peak], [top_line, top_line], color="black", linestyle="-")
+                                    plt.annotate(str(mean_time-last_peak).replace(".", ",") + "h", xy=((mean_time+last_peak)/2, 0.93),
+                                                 xycoords=("data","axes fraction"), size=10, ha="center")
+                                    maximum_period_list.append(str(mean_time-last_peak).replace(".", ","))
+                                    mean_maximum_period += mean_time - last_peak
+                                    maximum_periods += 1
+
+                                top = max_voltage + (max_voltage - min_voltage) * 0.15
+                                bottom = max_voltage + (max_voltage - min_voltage) * 0.05
+                                plt.plot([mean_time, mean_time], [top, bottom], color="black", linestyle="-")
+                                maximum_phase_list.append(str(mean_time%24).replace(".", ",") + ";" + str(meanPeak).replace(".", ","))
+                                last_peak = mean_time
+                        if(len(valleys) and (input_list[settings]["period"] == "Minimum" or input_list[settings]["period"] == "Both")):
+                            if(not ((input_list[settings]["minimum"]["exclude_firstday"] and day == 0)
+                                     or (input_list[settings]["minimum"]["exclude_lastday"] and day_end == time_points[-1]))):
+                                valley = None
+                                smallest_valley = sys.float_info.max
+                                for i in valleys:
+                                    if(day_data[i] <= smallest_valley):
+                                        smallest_valley = day_data[i]
+                                        valley = i
+
+                                mean_time = None
+                                mean_valley = None
+                                if(day == 0):
+                                    mean_time, mean_valley = calculatePeakAndValleyMean(daytime_points[:-points], day_data[:-points],
+                                                                                        valley, threshold, "min")
+                                else:
+                                    mean_time, mean_valley = calculatePeakAndValleyMean(daytime_points[points:-points],
+                                                                                        day_data[points:-points], valley-points,
+                                                                                        threshold, "min")
+                                if(last_valley != None):
+                                    bottom_line = min_voltage - (max_voltage - min_voltage) * 0.1
+                                    plt.plot([mean_time, last_valley], [bottom_line, bottom_line], color="black", linestyle="-")
+                                    plt.annotate(str(mean_time-last_valley).replace(".", ",") + "h", xy=((mean_time+last_valley)/2, 0.04),
+                                                 xycoords=("data","axes fraction"), size=10, ha="center")
+                                    minimum_period_list.append(str(mean_time-last_valley).replace(".", ","))
+                                    mean_minimum_period += mean_time - last_valley
+                                    minimum_periods += 1
+
+                                top = min_voltage - (max_voltage - min_voltage) * 0.15
+                                bottom = min_voltage - (max_voltage - min_voltage) * 0.05
+                                plt.plot([mean_time, mean_time], [top, bottom], color="black", linestyle="-")
+                                minimum_phase_list.append(str(mean_time%24).replace(".", ",") + ";" + str(mean_valley).replace(".", ","))
+                                last_valley = mean_time
 
                     del valleys[:]
                     del peaks[:]
@@ -374,8 +429,6 @@ def plotData(selected_group, input_list, highest_columns_index, progress, lock):
         return
     except:
         return traceback.format_exc()
-
-
 
 def calculatePeakAndValleyMean(x, y, point, threshold, mode):
     value_list = []

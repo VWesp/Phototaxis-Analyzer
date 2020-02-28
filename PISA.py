@@ -11,31 +11,7 @@ if __name__ == "__main__":
     import subprocess
     import tkinter as tk
     from tkinter import ttk, filedialog, messagebox
-    from PIL import ImageTk, Image
     import traceback
-
-    class LoadingScreen(tk.Toplevel):
-
-        def __init__(self, parent):
-            tk.Toplevel.__init__(self, parent)
-            self.title("Loading screen")
-            try:
-                loading_image = None
-                try:
-                    loading_image = ImageTk.PhotoImage(Image.open("../../icon/loading_sun.png"))
-                except:
-                    loading_image = root.iconbitmap("icon/loading_sun.png")
-
-                tk.Label(self, image=loading_image).pack(side="bottom", fill="both", expand="yes")
-            except:
-                self.geometry("210x210")
-                loading_text = tk.StringVar()
-                loading_text.set("<Unable\n\nto display\n\nloading image!>\n\nLoading\napplication...")
-                label = tk.Label(self, textvariable=loading_text)
-                label.config(font=("Courier", 18))
-                label.pack(side="bottom", fill="both", expand="yes")
-
-            self.update()
 
     class Application(tk.Frame):
 
@@ -45,7 +21,7 @@ if __name__ == "__main__":
                                       "datanumber": 5, "minutepoint": -1, "period": "Both", "color": "#000000",
                                       "minimum": {"exclude_firstday": False, "exclude_lastday": True},
                                       "maximum": {"exclude_firstday": True, "exclude_lastday": False},
-                                      "xlabel": "Days","sg_filter": {"on": False, "window": 11, "poly": 3,
+                                      "xlabel": "Days","sg_filter": {"on": False, "period": True, "window": 11, "poly": 3,
                                       "color": "#800000"},"pv_points": 1, "pv_amp_per": 3,
                                       "data_per_measurement": sys.maxsize, "timepoint_indices": [],
                                       "data_minutepoints": sys.maxsize, "set_columns": {}, "dn_cycle": {"on": True,
@@ -152,7 +128,7 @@ if __name__ == "__main__":
                                                       "minutepoint": -1, "period": "Both", "color": "#000000",
                                                       "minimum": {"exclude_firstday": False, "exclude_lastday": True},
                                                       "maximum": {"exclude_firstday": True, "exclude_lastday": False},
-                                                      "xlabel": "Days", "sg_filter": {"on": False, "window": 11, "poly": 3,
+                                                      "xlabel": "Days", "sg_filter": {"on": False, "period": True, "window": 11, "poly": 3,
                                                       "color": "#800000"}, "pv_points": 1, "pv_amp_per": 3, "dn_cycle": {"on": True,
                                                       "background": "#929591", "visibility": 50}, "set_columns": {}, "set_settings": False,
                                                       "merge_plots": {"on": True, "threshold": 3.5, "color": "#000000"}}
@@ -270,7 +246,7 @@ if __name__ == "__main__":
                     for file in self.input_list[self.file_options_var.get()]["file_names"]:
                         self.getLogStats(file)
 
-                with open(self.input_list[self.file_options_var.get()]["output"] + "log.txt", "w") as log_writer:
+                with open(self.input_list[self.file_options_var.get()]["output"] + self.file_options_var.get() + "_log.txt", "w") as log_writer:
                     log_writer.write("#Log file of group: " + self.file_options_var.get() + "\n" + "\n".join(self.log_list))
             elif(not self.cancel_analysis and error and single_plots_pdf.get()[0] != None):
                 self.status_var.set("Status: Error during analysis.")
@@ -441,7 +417,7 @@ if __name__ == "__main__":
                                          borderwidth=2, relief="groove")
             tk.Button(button_frame, text="Ok", command=lambda:
                       self.setGeneralSettings(point_size, starting_point, data_number, minute_point,
-                                              period, minimum_exclude, maximum_exclude, x_label, sg_filter,
+                                              period, minimum_exclude, maximum_exclude, x_label, sg_filter, sg_period,
                                               dn_cycle, visibility, merge_setting, merge_threshold, set_settings)
                                               ).pack(side="left", expand=1, pady=3)
             tk.Button(button_frame, text="Advanced",
@@ -529,11 +505,18 @@ if __name__ == "__main__":
             merge_frame.pack(fill="both", expand=1, pady=5)
 
             sg_frame = tk.LabelFrame(self.settings_frame, text="Sg-Filter", borderwidth=2, relief="groove")
+            sg_plot_settings = tk.Frame(sg_frame)
             sg_filter = tk.BooleanVar()
             sg_filter.set(self.input_list[self.file_options_var.get()]["sg_filter"]["on"])
-            tk.Checkbutton(sg_frame, text=" Turn filter on", var=sg_filter).pack(side="left", padx=20)
-            tk.Button(sg_frame, text="Color of SG-Plot", command=lambda:
+            tk.Checkbutton(sg_plot_settings, text=" Turn plotting filter on", var=sg_filter).pack(side="left", padx=20)
+            tk.Button(sg_plot_settings, text="Color of SG-Plot", command=lambda:
                       self.setPlotColor(0)).pack(side="left")
+            sg_plot_settings.pack(fill="both", expand=1, pady=5)
+            sg_period_settings = tk.Frame(sg_frame)
+            sg_period = tk.BooleanVar()
+            sg_period.set(self.input_list[self.file_options_var.get()]["sg_filter"]["period"])
+            tk.Checkbutton(sg_period_settings, text=" Turn period calculation filter on", var=sg_period).pack(side="left", padx=20)
+            sg_period_settings.pack(fill="both", expand=1, pady=5)
             sg_frame.pack(fill="both", expand=1, pady=5)
 
             set_settings = tk.BooleanVar()
@@ -627,7 +610,7 @@ if __name__ == "__main__":
                                                    "period": "Both", "color": "#000000",
                                                    "minimum": {"exclude_firstday": False, "exclude_lastday": True},
                                                    "maximum": {"exclude_firstday": True, "exclude_lastday": False},
-                                                   "xlabel": "Days", "sg_filter": {"on": False, "window": 11,
+                                                   "xlabel": "Days", "sg_filter": {"on": False, "period": True, "window": 11,
                                                    "poly": 3,"color": "#800000"}, "pv_points": 1, "pv_amp_per": 3,
                                                    "data_per_measurement": data_per_measurement,
                                                    "timepoint_indices": timepoint_indices, "set_columns": {},
@@ -795,7 +778,7 @@ if __name__ == "__main__":
 
 
         def setGeneralSettings(self, point_size, starting_point, data_number, minute_point,
-                               period, minimum_exclude, maximum_exclude, x_label, sg_filter,
+                               period, minimum_exclude, maximum_exclude, x_label, sg_filter, sg_period,
                                dn_cycle, visibility, merge_setting, merge_threshold, set_settings):
             global input_list
             self.input_list[self.file_options_var.get()]["pointsize"] = point_size.get()
@@ -811,6 +794,7 @@ if __name__ == "__main__":
             self.input_list[self.file_options_var.get()]["dn_cycle"]["on"] = dn_cycle.get()
             self.input_list[self.file_options_var.get()]["dn_cycle"]["visibility"] = visibility.get()
             self.input_list[self.file_options_var.get()]["sg_filter"]["on"] = sg_filter.get()
+            self.input_list[self.file_options_var.get()]["sg_filter"]["period"] = sg_period.get()
             self.input_list[self.file_options_var.get()]["merge_plots"]["on"] = merge_setting.get()
             self.input_list[self.file_options_var.get()]["merge_plots"]["threshold"] = merge_threshold.get()
             self.input_list[self.file_options_var.get()]["set_settings"] = set_settings.get()
@@ -1001,8 +985,6 @@ if __name__ == "__main__":
 
     try:
         root = tk.Tk()
-        #loading_screen = LoadingScreen(root)
-        #root.geometry("380x400")
         try:
             root.iconbitmap("../../icon/leaning-tower-of-pisa.ico")
         except:
@@ -1018,7 +1000,6 @@ if __name__ == "__main__":
         root.style.theme_use("clam")
         root.style.configure("green.Horizontal.TProgressbar", foreground="green", background="green")
         Application(root)
-        #loading_screen.destroy()
         root.mainloop()
     except Exception:
         messagebox.showerror("Critical error", "A critical error occurred while executing the program. See the message below for more details:\n\n"
