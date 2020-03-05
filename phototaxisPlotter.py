@@ -78,9 +78,6 @@ def plotData(selected_group, input_list, highest_columns_index, progress, lock):
                 data_inverted_mean_smoothed = signal.savgol_filter(data_inverted_mean,
                                                                    input_list[settings]["sg_filter"]["window"],
                                                                    input_list[settings]["sg_filter"]["poly"])
-                data_inverted_mean_smoothed = signal.savgol_filter(data_inverted_mean_smoothed,
-                                                                   input_list[settings]["sg_filter"]["window"],
-                                                                   input_list[settings]["sg_filter"]["poly"])
                 x_y_values[file]["mean_values"][column] = data_inverted_mean
                 figure = plt.figure()
                 plt.plot(time_points, data_inverted_mean, marker="o", markersize=input_list[settings]["pointsize"],

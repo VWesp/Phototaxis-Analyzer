@@ -1,8 +1,8 @@
 #Log file of group: PhT64_32_2020-01-14_14-32-34
 #<---------- file/group PhT64_32_2020-01-14_14-32-34 ---------->
 [file_names]	PhT64_32_2020-01-14_14-32-34
-[path]	C:/Users/Christin/Desktop/Phototaxis complete 20150807/Messungen/2020/20_01_14/PhT64_32_2020-01-14_14-32-34.txt
-[output]	C:/Users/Christin/Desktop/Phototaxis complete 20150807/Messungen/2020/20_01_14/
+[path]	C:/Users/euidhtn/Desktop/Phototaxis-Analyzer/examples/20_01_14/PhT64_32_2020-01-14_14-32-34.txt
+[output]	C:/Users/euidhtn/Desktop/Phototaxis-Analyzer/examples/20_01_14/
 [pointsize]	3
 [startingpoint]	12
 [datanumber]	5
@@ -12,7 +12,7 @@
 [minimum]	{'exclude_firstday': False, 'exclude_lastday': True}
 [maximum]	{'exclude_firstday': True, 'exclude_lastday': False}
 [xlabel]	Days
-[sg_filter]	{'on': False, 'window': 11, 'poly': 3, 'color': '#800000'}
+[sg_filter]	{'on': False, 'period': False, 'window': 11, 'poly': 3, 'color': '#800000'}
 [pv_points]	1
 [pv_amp_per]	3
 [dn_cycle]	{'on': True, 'background': '#929591', 'visibility': 50}
